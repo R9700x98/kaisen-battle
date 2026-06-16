@@ -787,14 +787,18 @@ nav {
       </div>
     </div>
     <div class="card">
-      <div class="card-title">海図</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <div class="card-title" style="margin-bottom:0">海図</div>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-secondary btn-sm" onclick="resetPlacement()" style="margin-bottom:0;padding:6px 12px;font-size:13px;width:auto">↺ リセット</button>
+          <button class="btn btn-primary btn-sm" id="place-confirm" onclick="confirmPlacement()" disabled style="opacity:0.4;margin-bottom:0;padding:6px 12px;font-size:13px;width:auto">決定 ✓</button>
+        </div>
+      </div>
+      <div id="place-msg" class="banner banner-warn" style="display:none;margin-bottom:8px"></div>
       <div class="grid-wrap">
         <div class="grid-container" id="place-grid"></div>
       </div>
     </div>
-    <div id="place-msg" class="banner banner-warn" style="display:none"></div>
-    <button class="btn btn-secondary" onclick="resetPlacement()">↺ リセット</button>
-    <button class="btn btn-primary" id="place-confirm" onclick="confirmPlacement()" disabled style="opacity:0.4">この配置で決定</button>
   </div>
 </div>
 
@@ -843,7 +847,12 @@ nav {
       <!-- 座標宣言フェーズ -->
       <div id="battle-phase-declare">
         <div class="card">
-          <div class="card-title">敵海図（推測）</div>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+            <div class="card-title" style="margin-bottom:0">敵海図（推測）</div>
+            <input type="hidden" id="sel-col" value="">
+            <input type="hidden" id="sel-row" value="">
+            <button class="btn btn-primary btn-sm" onclick="declareAttack()" style="margin-bottom:0;padding:8px 16px;font-size:14px;width:auto">攻撃宣言 →</button>
+          </div>
           <div class="legend">
             <div class="legend-item"><div class="legend-dot ld-hit"></div>○ 命中</div>
             <div class="legend-item"><div class="legend-dot ld-near"></div>△ 波高し</div>
@@ -852,11 +861,6 @@ nav {
           <div class="grid-wrap">
             <div class="grid-container" id="enemy-grid"></div>
           </div>
-        </div>
-        <div class="card">
-          <input type="hidden" id="sel-col" value="">
-          <input type="hidden" id="sel-row" value="">
-          <button class="btn btn-primary" onclick="declareAttack()">攻撃宣言 →</button>
         </div>
       </div>
 
@@ -889,10 +893,7 @@ nav {
           <div class="grid-container" id="own-grid"></div>
         </div>
       </div>
-      <div class="card">
-        <div class="card-title">艦隊状況</div>
-        <div id="ship-status"></div>
-      </div>
+
     </div>
 
     <!-- ログタブ -->
@@ -1685,24 +1686,7 @@ function renderOwnGrid() {
   });
 }
 
-function renderShipStatus() {
-  // 自陣状況は常に人間(index 0)を表示
-  const atk = (state.mode === 'vs-cpu') ? 0 : state.currentPlayer;
-  const pd = state.playerData[atk];
-  const el = document.getElementById('ship-status');
-  el.innerHTML = '';
-  pd.ships.forEach(ship => {
-    const hitCount = ship.cells.filter(([ci, ri]) =>
-      pd.attacks.some(a => a.coord[0] === ci && a.coord[1] === ri)
-    ).length;
-    const sunk = hitCount >= ship.size;
-    const row = document.createElement('div');
-    row.className = 'ship-status-row';
-    row.innerHTML = `<span class="ship-status-name">${ship.name}</span>
-      <span class="ship-status-val ${sunk ? 'dead' : 'alive'}">${sunk ? '撃沈' : `${hitCount}/${ship.size}`}</span>`;
-    el.appendChild(row);
-  });
-}
+function renderShipStatus() { /* 非表示 */ }
 
 function renderAttackCounter() {
   // 敵対戦時は常に人間(0)を表示

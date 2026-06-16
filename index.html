@@ -252,6 +252,11 @@ nav {
   overflow: hidden;
   min-width: 270px;
 }
+#place-grid {
+  touch-action: none; /* ドラッグ中のスクロールを防ぐ */
+  user-select: none;
+  -webkit-user-select: none;
+}
 .grid-header {
   background: var(--surface2);
   display: flex;
@@ -283,42 +288,54 @@ nav {
 
 /* ── 艦隊配置 ── */
 .ship-list { margin-bottom: 12px; }
+.ship-list-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
 .ship-item {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--sep2);
+  justify-content: center;
+  padding: 10px 6px;
+  border-radius: var(--radius-sm);
+  border: 1.5px solid var(--sep);
   cursor: pointer;
-  transition: background 0.1s;
-  gap: 12px;
+  transition: background 0.1s, border-color 0.1s;
+  gap: 6px;
+  text-align: center;
 }
-.ship-item:last-child { border-bottom: none; }
 .ship-item:active { background: var(--surface2); }
-.ship-item.selected { background: rgba(0,122,255,0.06); }
+.ship-item.selected { border-color: var(--accent); background: rgba(0,122,255,0.06); }
 .ship-item.placed { opacity: 0.4; cursor: default; }
 .ship-item-icon {
-  width: 32px; height: 32px;
+  width: 36px; height: 36px;
   border-radius: var(--radius-xs);
   background: linear-gradient(135deg, var(--accent), #5ac8fa);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 16px;
-  flex-shrink: 0;
+  font-size: 18px;
 }
 .ship-item.placed .ship-item-icon { background: var(--surface3); }
-.ship-name { flex: 1; font-size: 15px; font-weight: 500; }
+.ship-name {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--label2);
+  line-height: 1.3;
+}
 .ship-size-badge {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
   color: var(--label3);
   background: var(--surface2);
-  padding: 2px 7px;
-  border-radius: 10px;
+  padding: 1px 6px;
+  border-radius: 8px;
 }
 .placed-check {
   color: var(--green);
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 700;
 }
 
@@ -762,7 +779,7 @@ nav {
     <div class="card">
       <div class="card-title" id="placement-title">艦隊配置</div>
       <p style="font-size:13px;color:var(--label3);margin-bottom:12px">① 艦を選択 ② 向きを選択 ③ マスをタップして配置</p>
-      <div class="list-card ship-list" id="ship-list"></div>
+      <div class="ship-list-grid" id="ship-list"></div>
       <div class="seg-control" style="margin-top:12px">
         <button class="seg-btn active" id="dir-h" onclick="setDir('h')">→ 横</button>
         <button class="seg-btn" id="dir-v" onclick="setDir('v')">↓ 縦</button>
@@ -825,22 +842,6 @@ nav {
       <!-- 座標宣言フェーズ -->
       <div id="battle-phase-declare">
         <div class="card">
-          <div class="card-title">攻撃座標を選択</div>
-          <div class="select-row">
-            <select id="sel-col" class="apple-select" onchange="onSelectChange()">
-              <option value="">列</option>
-              <option>A</option><option>B</option><option>C</option><option>D</option><option>E</option>
-              <option>F</option><option>G</option><option>H</option><option>I</option><option>J</option>
-            </select>
-            <select id="sel-row" class="apple-select" onchange="onSelectChange()">
-              <option value="">行</option>
-              <option>1</option><option>2</option><option>3</option><option>4</option><option>5</option>
-              <option>6</option><option>7</option><option>8</option><option>9</option><option>10</option>
-            </select>
-          </div>
-          <button class="btn btn-primary" onclick="declareAttack()">攻撃宣言 →</button>
-        </div>
-        <div class="card">
           <div class="card-title">敵海図（推測）</div>
           <div class="legend">
             <div class="legend-item"><div class="legend-dot ld-hit"></div>○ 命中</div>
@@ -850,6 +851,11 @@ nav {
           <div class="grid-wrap">
             <div class="grid-container" id="enemy-grid"></div>
           </div>
+        </div>
+        <div class="card">
+          <input type="hidden" id="sel-col" value="">
+          <input type="hidden" id="sel-row" value="">
+          <button class="btn btn-primary" onclick="declareAttack()">攻撃宣言 →</button>
         </div>
       </div>
 
@@ -1208,21 +1214,27 @@ function renderShipList() {
   const pd = state.playerData[state.placementPlayer];
   const list = document.getElementById('ship-list');
   list.innerHTML = '';
+  const icons = { carrier:'🛸', escort:'⛵', sub1:'🐟', sub2:'🐠' };
+  const shortNames = { carrier:'空母', escort:'護衛艦', sub1:'潜水艦X', sub2:'潜水艦Z' };
   pd.ships.forEach(ship => {
+    const placed = ship.cells.length > 0;
+    const selected = placementState.selectedShip === ship.id && !placed;
     const div = document.createElement('div');
-    div.className = 'ship-item' +
-      (ship.cells.length > 0 ? ' placed' : '') +
-      (placementState.selectedShip === ship.id && ship.cells.length === 0 ? ' selected' : '');
+    div.className = 'ship-item' + (placed ? ' placed' : '') + (selected ? ' selected' : '');
     div.onclick = () => {
-      if (ship.cells.length > 0) return;
+      if (placed) return;
       placementState.selectedShip = ship.id;
       placementState.rotation = 0;
       updateDirButtons();
       renderShipList();
       renderPlaceGrid();
     };
-    const dots = Array(ship.size).fill('<div class="dot"></div>').join('');
-    div.innerHTML = `<span class="ship-name">${ship.name}（${ship.size}マス）${ship.cells.length > 0 ? ' ✓' : ''}</span><div class="ship-size-dots">${dots}</div>`;
+    div.innerHTML = `
+      <span class="ship-name">${shortNames[ship.id] || ship.name}</span>
+      ${placed
+        ? '<span class="placed-check">✓</span>'
+        : `<span class="ship-size-badge">${ship.size}マス</span>`
+      }`;
     list.appendChild(div);
   });
 }
@@ -1278,6 +1290,10 @@ const SHIP_LABELS = { carrier:'空', escort:'護', sub1:'潜', sub2:'潜' };
 let previewCells = [];
 let previewValid = false;
 
+// ドラッグ配置の状態
+let isDraggingPlace = false;
+let dragLastCi = -1, dragLastRi = -1;
+
 function renderPlaceGrid() {
   const pd = state.playerData[state.placementPlayer];
   const grid = document.getElementById('place-grid');
@@ -1304,13 +1320,64 @@ function renderPlaceGrid() {
         cell.style.fontSize = '10px';
       }
 
-      // タッチ・マウス両対応
-      cell.addEventListener('pointerenter', () => updatePreview(ci, ri));
-      cell.addEventListener('pointerleave', () => clearPreview());
-      cell.addEventListener('click', () => placeShip(ci, ri));
       grid.appendChild(cell);
     });
   });
+
+  // グリッド全体でのpointerイベント（スマホドラッグ対応）
+  grid.addEventListener('pointerdown', onPlacePointerDown);
+  grid.addEventListener('pointermove', onPlacePointerMove);
+  grid.addEventListener('pointerup',   onPlacePointerUp);
+  grid.addEventListener('pointercancel', onPlacePointerUp);
+}
+
+function getCellFromPoint(x, y) {
+  // タッチ/マウス座標からdata-ci/riを持つセルを取得
+  const el = document.elementFromPoint(x, y);
+  if (!el) return null;
+  const cell = el.closest('[data-ci]');
+  if (!cell) return null;
+  const ci = parseInt(cell.dataset.ci);
+  const ri = parseInt(cell.dataset.ri);
+  if (isNaN(ci) || isNaN(ri)) return null;
+  return { ci, ri };
+}
+
+function onPlacePointerDown(e) {
+  if (!placementState.selectedShip) return;
+  e.preventDefault();
+  isDraggingPlace = true;
+  dragLastCi = -1;
+  dragLastRi = -1;
+  const pos = getCellFromPoint(e.clientX, e.clientY);
+  if (pos) {
+    updatePreview(pos.ci, pos.ri);
+    dragLastCi = pos.ci;
+    dragLastRi = pos.ri;
+  }
+}
+
+function onPlacePointerMove(e) {
+  if (!isDraggingPlace) return;
+  e.preventDefault();
+  const pos = getCellFromPoint(e.clientX, e.clientY);
+  if (!pos) return;
+  if (pos.ci === dragLastCi && pos.ri === dragLastRi) return;
+  dragLastCi = pos.ci;
+  dragLastRi = pos.ri;
+  updatePreview(pos.ci, pos.ri);
+}
+
+function onPlacePointerUp(e) {
+  if (!isDraggingPlace) return;
+  isDraggingPlace = false;
+  e.preventDefault();
+  const pos = getCellFromPoint(e.clientX, e.clientY);
+  if (pos) {
+    placeShip(pos.ci, pos.ri);
+  } else {
+    clearPreview();
+  }
 }
 
 function updatePreview(ci, ri) {
@@ -1678,7 +1745,7 @@ function switchTab(tab) {
 function declareAttack() {
   const col = document.getElementById('sel-col').value;
   const row = document.getElementById('sel-row').value;
-  if (!col || !row) { setBattleMsg('座標を選択してください', 'warn'); return; }
+  if (!col || !row) { setBattleMsg('海図のマスをタップして座標を選択してください', 'warn'); return; }
 
   const ci = COLS.indexOf(col);
   const ri = ROWS.indexOf(row);
@@ -1984,24 +2051,36 @@ function cpuChooseEasy() {
 // Normal: 命中後は周囲4方向を優先、連続命中なら延長方向を優先
 function cpuChooseNormal() {
   const cpuPd = state.playerData[1];
-  const hits = cpuPd.myAttacks.filter(a => a.result === 'hit').map(a => a.coord);
-  const unattacked = getUnattacked();
+  const excludeZone = getSunkExcludeZone();
+
+  // アクティブな命中（撃沈済み除外）
+  const activeHits = cpuPd.myAttacks
+    .filter(a => a.result === 'hit' && !excludeZone.has(`${a.coord[0]},${a.coord[1]}`))
+    .map(a => a.coord);
+
+  const allUnattacked = getUnattacked();
+  const unattacked = allUnattacked.filter(([c,r]) => !excludeZone.has(`${c},${r}`));
   const unset = new Set(unattacked.map(([c,r]) => `${c},${r}`));
 
-  if (hits.length > 0) {
-    // 連続命中（直線上）があれば延長方向を最優先
-    const lineTargets = getLineExtensions(hits, unset);
+  if (activeHits.length > 0) {
+    // 連続命中の延長を最優先
+    const lineTargets = getLineExtensions(activeHits, unset);
     if (lineTargets.length > 0)
       return lineTargets[Math.floor(Math.random() * lineTargets.length)];
 
-    // 命中セルの周囲4方向
-    const around = getAroundHits(hits, unset);
+    // 命中周囲4方向
+    const around = getAroundHits(activeHits, unset);
     if (around.length > 0)
       return around[Math.floor(Math.random() * around.length)];
   }
 
-  // 命中なし：ランダム
-  return unattacked[Math.floor(Math.random() * unattacked.length)];
+  // 探索フェーズ：市松模様でランダム
+  const checkerboard = unattacked.filter(([c,r]) => (c + r) % 2 === 0);
+  if (checkerboard.length > 0)
+    return checkerboard[Math.floor(Math.random() * checkerboard.length)];
+
+  return unattacked[Math.floor(Math.random() * unattacked.length)]
+      || allUnattacked[Math.floor(Math.random() * allUnattacked.length)];
 }
 
 // Hard: 命中後の推論 + △波高しも活用 + 市松模様パターンで効率探索
@@ -2050,36 +2129,48 @@ function buildForbiddenSet(info, excludeZone) {
 function isPatternValid(cells, info, forbidden) {
   const cellKeys = cells.map(([c,r]) => `${c},${r}`);
 
-  // 禁止マスに重なるパターンは無効
+  // 1. 禁止マスに重なるパターンは無効（×はずれ＋周囲8マス＋撃沈除外ゾーン）
   if (cellKeys.some(k => forbidden.has(k))) return false;
 
-  // ○命中マスがある場合：そのマスを含むパターンを優先
-  // （命中マスを1つでも含まないパターンは低優先だが除外はしない）
-  // ただしすでに命中済みのマスに重なる場合、そのマスはhitでないと矛盾
+  // 2. このパターンが「説明できない命中マス」を作らないか確認
+  //    命中マスがパターン外にある場合、そのマスは別の船のはず → このパターンは有効
+  //    ただし、命中マスがパターン内にある場合、そのマスが本当に命中か確認（矛盾チェック）
+  //    → 命中マスにパターンが重なっているのはOK
+
+  // 3. パターンが「はずれマス」を含んでいないか（forbiddenで除外済みだが念のため）
   for (const k of cellKeys) {
-    // 命中済みでも波高しでもない攻撃済みマス → はずれ → forbidden で除外済み
+    if (info.miss.has(k)) return false;
   }
 
-  // 波高しマスの検証:
-  // 波高し△は「周囲8マスのどこかに船がいる」ことを意味する
-  // このパターンが波高しマスの周囲に存在するかチェック（スコア加算用、除外はしない）
+  // 4. 波高しの整合性チェック
+  //    波高しマスの「周囲8マスのどこかにこのパターンが掛かる」なら整合性あり
+  //    ただし「波高しマスの周囲にパターンが全く掛からないのに波高しが出た」は矛盾
+  //    → 波高しが存在する場合、そのうち少なくとも1つをこのパターンが説明できなくても
+  //       別の船が説明できる可能性があるため除外しない（スコアリングで対応）
 
   return true;
 }
 
 // 確率マップを構築してスコア最大のマスを返す
 function cpuChooseExpert() {
-  const cpuPd  = state.playerData[1];
-  const info   = buildInfoMap();
+  const cpuPd   = state.playerData[1];
+  const humanPd = state.playerData[0];
+  const info        = buildInfoMap();
   const excludeZone = getSunkExcludeZone();
   const forbidden   = buildForbiddenSet(info, excludeZone);
 
-  // スコアマップ（100マス）
-  const scoreMap = Array(10).fill(null).map(() => Array(10).fill(0));
-
-  // 未撃沈の船ごとに全配置パターンを列挙
-  const humanPd = state.playerData[0];
+  // 未撃沈の船リスト
   const aliveShips = humanPd.ships.filter(s => !s.sunk);
+
+  // アクティブな命中マス（撃沈除外ゾーン外）
+  const activeHits = new Set(
+    cpuPd.myAttacks
+      .filter(a => a.result === 'hit' && !excludeZone.has(`${a.coord[0]},${a.coord[1]}`))
+      .map(a => `${a.coord[0]},${a.coord[1]}`)
+  );
+
+  // スコアマップ
+  const scoreMap = Array(10).fill(null).map(() => Array(10).fill(0));
 
   aliveShips.forEach(ship => {
     const patterns = getAllShipPatterns(ship);
@@ -2087,32 +2178,54 @@ function cpuChooseExpert() {
     patterns.forEach(cells => {
       if (!isPatternValid(cells, info, forbidden)) return;
 
-      // 命中済みマスを含むパターンにボーナス
-      const hitBonus = cells.some(([c,r]) => info.hit.has(`${c},${r}`)) ? 3 : 1;
+      const cellKeys = cells.map(([c,r]) => `${c},${r}`);
 
-      // 波高しマスの周囲にあるパターンにボーナス
+      // ── スコア計算 ──
+
+      // A. 命中マスを含む数（多いほど高スコア）
+      const hitCount = cellKeys.filter(k => activeHits.has(k)).length;
+
+      // B. 命中マスが存在するのにこのパターンが1つも含まない → 探索フェーズ用に低スコア
+      const hasAnyHit = activeHits.size > 0;
+      if (hasAnyHit && hitCount === 0) {
+        // 命中追跡中は、命中を含まないパターンの寄与を大幅に下げる
+        cells.forEach(([c,r]) => { scoreMap[r][c] += 0.1; });
+        return;
+      }
+
+      // C. 波高しマスの周囲をカバーするパターンにボーナス
       let nearBonus = 0;
       info.near.forEach(nk => {
         const [nc, nr] = nk.split(',').map(Number);
-        if (cells.some(([c,r]) => Math.abs(c-nc) <= 1 && Math.abs(r-nr) <= 1))
-          nearBonus += 1;
+        if (cellKeys.some(k => {
+          const [kc, kr] = k.split(',').map(Number);
+          return Math.abs(kc - nc) <= 1 && Math.abs(kr - nr) <= 1;
+        })) nearBonus += 2;
       });
 
-      const bonus = hitBonus + nearBonus;
+      // D. 命中マスを全て連続して含むパターン（直線整合）にさらにボーナス
+      let lineBonus = 0;
+      if (hitCount >= 2) {
+        // 全命中マスがこのパターン内に含まれているか
+        const allHitsCovered = [...activeHits].every(k => cellKeys.includes(k));
+        if (allHitsCovered) lineBonus = hitCount * 3;
+      }
+
+      const score = (hitCount * 5) + nearBonus + lineBonus + 1;
       cells.forEach(([c,r]) => {
-        scoreMap[r][c] += bonus;
+        scoreMap[r][c] += score;
       });
     });
   });
 
-  // 未攻撃マスの中でスコア最大を選ぶ
+  // 攻撃済みマスを除外してスコア最大を選択
+  const attacked = new Set(cpuPd.myAttacks.map(a => `${a.coord[0]},${a.coord[1]}`));
   let bestScore = -1;
   let bestCells = [];
 
   for (let r = 0; r < 10; r++) {
     for (let c = 0; c < 10; c++) {
-      // 攻撃済みはスキップ
-      if (cpuPd.myAttacks.some(a => a.coord[0] === c && a.coord[1] === r)) continue;
+      if (attacked.has(`${c},${r}`)) continue;
       if (scoreMap[r][c] > bestScore) {
         bestScore = scoreMap[r][c];
         bestCells = [[c, r]];

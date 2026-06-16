@@ -1,0 +1,2423 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Kaisen Battle</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+JP:wght@300;400;500;700&display=swap');
+
+:root {
+  /* White theme (default) */
+  --bg:          #f2f2f7;
+  --surface:     #ffffff;
+  --surface2:    #f2f2f7;
+  --surface3:    #e5e5ea;
+  --accent:      #007aff;
+  --accent-rgb:   0,122,255;
+  --accent-dark: #0062cc;
+  --green:       #34c759;
+  --red:         #ff3b30;
+  --orange:      #ff9500;
+  --label:       #000000;
+  --label2:      #3c3c43;
+  --label3:      #8e8e93;
+  --sep:         rgba(60,60,67,0.12);
+  --sep2:        rgba(60,60,67,0.06);
+  --hit-bg:      #fff1f0;
+  --near-bg:     #fff8ec;
+  --miss-bg:     #f2f2f7;
+  --cell-bg:     #f0f4ff;
+  --cell-ship:   #dce8ff;
+  --shadow:      0 1px 3px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.04);
+  --shadow-sm:   0 1px 2px rgba(0,0,0,0.06);
+  --radius:      12px;
+  --radius-sm:   8px;
+  --radius-xs:   6px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+body {
+  background: var(--bg);
+  color: var(--label);
+  font-family: 'Noto Sans JP', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── ナビゲーションバー ── */
+nav {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: rgba(255,255,255,0.85);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  border-bottom: 1px solid var(--sep);
+  padding: 0 16px;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.nav-title {
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--label);
+  letter-spacing: -0.3px;
+}
+#phase-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--accent);
+  background: rgba(0,122,255,0.1);
+  padding: 3px 8px;
+  border-radius: 20px;
+}
+
+/* ── テーマバー ── */
+#theme-bar {
+  background: rgba(255,255,255,0.85);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--sep);
+  padding: 8px 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+#theme-bar::-webkit-scrollbar { display: none; }
+.theme-label {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--label3);
+  white-space: nowrap;
+  flex-shrink: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.theme-btn {
+  width: 20px; height: 20px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: transform 0.18s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.18s;
+  box-shadow: var(--shadow-sm);
+}
+.theme-btn:hover { transform: scale(1.25); }
+.theme-btn.active {
+  border-color: var(--label);
+  transform: scale(1.2);
+  box-shadow: 0 0 0 2px rgba(255,255,255,0.9) inset, 0 2px 6px rgba(0,0,0,0.2);
+}
+
+/* ── ページ管理 ── */
+.page { display: none; }
+.page.active { display: block; }
+
+/* ── コンテンツ領域 ── */
+.screen {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 20px 16px;
+}
+
+/* ── タイトル画面 ── */
+#title-screen {
+  text-align: center;
+  padding-top: 48px;
+}
+.title-icon {
+  width: 96px; height: 96px;
+  background: var(--surface);
+  border-radius: 22px;
+  border: 2px solid var(--sep);
+  margin: 0 auto 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--shadow);
+}
+#title-screen h2 {
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  color: var(--label);
+  margin-bottom: 8px;
+}
+#title-screen .subtitle {
+  font-size: 15px;
+  color: var(--label3);
+  margin-bottom: 40px;
+  font-weight: 400;
+}
+
+/* ── ボタン ── */
+.btn {
+  display: block;
+  width: 100%;
+  padding: 15px;
+  border-radius: var(--radius);
+  border: none;
+  font-size: 17px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s, transform 0.12s;
+  margin-bottom: 10px;
+  font-family: inherit;
+  letter-spacing: -0.2px;
+}
+.btn:active { opacity: 0.75; transform: scale(0.98); }
+.btn-primary {
+  background: var(--accent);
+  color: #fff;
+}
+.btn-secondary {
+  background: var(--surface3);
+  color: var(--label);
+}
+.btn-ghost {
+  background: transparent;
+  color: var(--accent);
+  border: 1.5px solid var(--accent);
+}
+.btn-danger {
+  background: var(--red);
+  color: #fff;
+}
+.btn-sm {
+  display: inline-block;
+  width: auto;
+  padding: 9px 18px;
+  font-size: 14px;
+  border-radius: var(--radius-sm);
+}
+
+/* ── カード（旧panel）── */
+.card {
+  background: var(--surface);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 16px;
+  margin-bottom: 12px;
+  border: none;
+}
+.card-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--label3);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 12px;
+}
+
+/* ── セクションリスト ── */
+.list-card {
+  background: var(--surface);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  margin-bottom: 12px;
+  overflow: hidden;
+}
+.list-row {
+  display: flex;
+  align-items: center;
+  padding: 13px 16px;
+  border-bottom: 1px solid var(--sep2);
+  transition: background 0.12s;
+}
+.list-row:last-child { border-bottom: none; }
+.list-row:active { background: var(--surface2); }
+.list-row-label { flex: 1; font-size: 15px; color: var(--label); }
+.list-row-val {
+  font-size: 15px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── グリッド ── */
+.grid-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.grid-container {
+  display: grid;
+  grid-template-columns: 22px repeat(10, 1fr);
+  grid-template-rows: 18px repeat(10, 1fr);
+  gap: 1px;
+  background: #ffffff;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  min-width: 270px;
+}
+.grid-header {
+  background: var(--surface2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--label3);
+  letter-spacing: 0.02em;
+}
+.cell {
+  background: var(--cell-bg);
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.1s;
+  min-width: 0;
+  user-select: none;
+}
+.cell:active { background: #d4e4ff; }
+.cell.ship { background: var(--cell-ship); color: var(--accent); font-size: 9px; font-weight: 700; }
+.cell.hit   { background: var(--hit-bg);  color: var(--red);    }
+.cell.near  { background: var(--near-bg); color: var(--orange); }
+.cell.miss  { background: var(--miss-bg); color: var(--label3); }
+
+/* ── 艦隊配置 ── */
+.ship-list { margin-bottom: 12px; }
+.ship-item {
+  display: flex;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--sep2);
+  cursor: pointer;
+  transition: background 0.1s;
+  gap: 12px;
+}
+.ship-item:last-child { border-bottom: none; }
+.ship-item:active { background: var(--surface2); }
+.ship-item.selected { background: rgba(0,122,255,0.06); }
+.ship-item.placed { opacity: 0.4; cursor: default; }
+.ship-item-icon {
+  width: 32px; height: 32px;
+  border-radius: var(--radius-xs);
+  background: linear-gradient(135deg, var(--accent), #5ac8fa);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+.ship-item.placed .ship-item-icon { background: var(--surface3); }
+.ship-name { flex: 1; font-size: 15px; font-weight: 500; }
+.ship-size-badge {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--label3);
+  background: var(--surface2);
+  padding: 2px 7px;
+  border-radius: 10px;
+}
+.placed-check {
+  color: var(--green);
+  font-size: 18px;
+  font-weight: 700;
+}
+
+/* 向き選択 */
+.seg-control {
+  display: flex;
+  background: var(--surface3);
+  border-radius: var(--radius-sm);
+  padding: 2px;
+  margin-bottom: 12px;
+  gap: 2px;
+}
+.seg-btn {
+  flex: 1;
+  padding: 7px;
+  border: none;
+  background: transparent;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--label3);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, box-shadow 0.15s;
+  font-family: inherit;
+}
+.seg-btn.active {
+  background: var(--surface);
+  color: var(--label);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+}
+
+/* ── ステータスバー ── */
+.status-pill-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.status-pill {
+  flex: 1;
+  background: var(--surface);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-sm);
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.pill-label { font-size: 11px; font-weight: 500; color: var(--label3); }
+.pill-val { font-size: 20px; font-weight: 700; color: var(--label); letter-spacing: -0.5px; }
+.pill-val.accent { color: var(--accent); }
+
+/* ── タブ ── */
+.tab-bar {
+  display: flex;
+  background: var(--surface);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  padding: 4px;
+  gap: 2px;
+  margin-bottom: 14px;
+}
+.tab {
+  flex: 1;
+  padding: 8px 4px;
+  border: none;
+  background: transparent;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--label3);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  font-family: inherit;
+}
+.tab.active {
+  background: var(--accent);
+  color: #fff;
+}
+
+/* ── メッセージバナー ── */
+.banner {
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  margin-bottom: 12px;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.5;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.banner-info { background: rgba(0,122,255,0.08); color: var(--accent-dark); }
+.banner-warn { background: rgba(255,149,0,0.1); color: #b06000; }
+.banner-danger { background: rgba(255,59,48,0.08); color: #cc2000; }
+.banner-icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+
+/* ── 返答ボタン ── */
+.response-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-top: 12px;
+}
+.resp-btn {
+  border: none;
+  border-radius: var(--radius);
+  padding: 18px 8px;
+  font-size: 24px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.12s, opacity 0.12s;
+  font-family: inherit;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.resp-btn:active { transform: scale(0.94); opacity: 0.8; }
+.resp-btn span { font-size: 11px; font-weight: 600; letter-spacing: 0.02em; }
+.resp-hit  { background: var(--hit-bg);  color: var(--red);    }
+.resp-near { background: var(--near-bg); color: var(--orange); }
+.resp-miss { background: var(--miss-bg); color: var(--label3); }
+
+/* ── 攻撃回数グリッド ── */
+.counter-grid {
+  display: grid;
+  grid-template-columns: repeat(10, 1fr);
+  gap: 3px;
+  margin-top: 8px;
+}
+.cnt-cell {
+  aspect-ratio: 1;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--label3);
+  background: var(--surface2);
+}
+.cnt-cell.used { background: rgba(0,122,255,0.15); color: var(--accent); }
+.cnt-cell.lost { background: rgba(255,59,48,0.1); color: var(--red); text-decoration: line-through; }
+
+/* ── セレクト ── */
+.select-row { display: flex; gap: 10px; margin-bottom: 12px; }
+.apple-select {
+  flex: 1;
+  background: var(--surface2);
+  border: 1.5px solid var(--sep);
+  border-radius: var(--radius-sm);
+  color: var(--label);
+  padding: 12px;
+  font-size: 16px;
+  font-family: inherit;
+  font-weight: 500;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%238e8e93' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 32px;
+}
+.apple-select:focus { outline: none; border-color: var(--accent); }
+
+/* ── input ── */
+.apple-input {
+  width: 100%;
+  background: var(--surface2);
+  border: 1.5px solid var(--sep);
+  border-radius: var(--radius-sm);
+  color: var(--label);
+  padding: 12px 14px;
+  font-size: 16px;
+  font-family: inherit;
+  font-weight: 400;
+  margin-bottom: 8px;
+  transition: border-color 0.15s;
+}
+.apple-input:focus { outline: none; border-color: var(--accent); }
+.apple-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--label3);
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* ── パス画面 ── */
+#page-pass .screen {
+  text-align: center;
+  padding-top: 80px;
+}
+.pass-icon {
+  width: 80px; height: 80px;
+  background: var(--surface3);
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 36px;
+  margin: 0 auto 24px;
+}
+#pass-title {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.4px;
+  margin-bottom: 10px;
+}
+#pass-desc {
+  font-size: 15px;
+  color: var(--label3);
+  margin-bottom: 32px;
+  line-height: 1.6;
+  white-space: pre-line;
+}
+
+/* ── 艦隊状況 ── */
+.ship-status-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--sep2);
+}
+.ship-status-row:last-child { border-bottom: none; }
+.ship-status-name { font-size: 15px; }
+.alive { color: var(--green); font-weight: 600; font-size: 13px; }
+.dead  { color: var(--red);   font-weight: 600; font-size: 13px; }
+
+/* ── モーダル ── */
+.modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.4);
+  backdrop-filter: blur(4px);
+  z-index: 100;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 0;
+}
+.modal-overlay.open { display: flex; }
+.modal {
+  background: var(--surface);
+  border-radius: 20px 20px 0 0;
+  width: 100%;
+  max-width: 480px;
+  padding: 24px 20px 36px;
+  text-align: center;
+  animation: slide-up 0.25s cubic-bezier(0.34,1.1,0.64,1);
+}
+@keyframes slide-up { from { transform: translateY(100%); } to { transform: translateY(0); } }
+.modal-handle {
+  width: 36px; height: 4px;
+  background: var(--sep);
+  border-radius: 2px;
+  margin: 0 auto 20px;
+}
+.modal h2 {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+  margin-bottom: 10px;
+}
+.modal p { color: var(--label2); margin-bottom: 20px; line-height: 1.6; font-size: 15px; }
+.modal-btns { display: flex; gap: 10px; }
+
+/* ── 凡例 ── */
+.legend {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.legend-item { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--label3); font-weight: 500; }
+.legend-dot { width: 10px; height: 10px; border-radius: 50%; }
+.ld-hit  { background: var(--red); }
+.ld-near { background: var(--orange); }
+.ld-miss { background: var(--sep); border: 1px solid var(--label3); }
+
+/* ── 結果画面 ── */
+#page-result .screen { text-align: center; padding-top: 60px; }
+.result-trophy {
+  font-size: 72px;
+  margin-bottom: 16px;
+  animation: bounce 0.6s cubic-bezier(0.34,1.56,0.64,1);
+}
+@keyframes bounce { from { transform: scale(0.5); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.result-title {
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  margin-bottom: 6px;
+}
+.result-desc { font-size: 15px; color: var(--label3); margin-bottom: 28px; }
+
+/* ── ログ ── */
+.log-item {
+  font-size: 13px;
+  color: var(--label2);
+  padding: 7px 0;
+  border-bottom: 1px solid var(--sep2);
+  line-height: 1.4;
+}
+.log-item:last-child { border-bottom: none; }
+
+/* ── ルール画面 ── */
+.rule-section { margin-bottom: 16px; }
+.rule-section h3 {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 6px;
+}
+.rule-section p {
+  font-size: 14px;
+  color: var(--label2);
+  line-height: 1.7;
+}
+</style>
+</head>
+<body>
+
+<!-- ナビ -->
+<nav>
+  <span class="nav-title">⚓ Kaisen Battle</span>
+  <span id="phase-label">待機中</span>
+</nav>
+
+<!-- テーマバー -->
+<div id="theme-bar">
+  <span class="theme-label">カラー</span>
+  <button class="theme-btn active" id="theme-blue"   title="Blue"   style="background:#007aff" onclick="setTheme('blue')"></button>
+  <button class="theme-btn"        id="theme-cyan"   title="Cyan"   style="background:#32ade6" onclick="setTheme('cyan')"></button>
+  <button class="theme-btn"        id="theme-green"  title="Green"  style="background:#34c759" onclick="setTheme('green')"></button>
+  <button class="theme-btn"        id="theme-orange" title="Orange" style="background:#ff9500" onclick="setTheme('orange')"></button>
+  <button class="theme-btn"        id="theme-red"    title="Red"    style="background:#ff3b30" onclick="setTheme('red')"></button>
+  <button class="theme-btn"        id="theme-purple" title="Purple" style="background:#af52de" onclick="setTheme('purple')"></button>
+  <button class="theme-btn"        id="theme-teal"   title="Teal"   style="background:#5ac8fa" onclick="setTheme('teal')"></button>
+</div>
+
+<!-- ========== タイトル ========== -->
+<div id="page-title" class="page active">
+  <div class="screen" id="title-screen">
+    <div class="title-icon">
+      <svg width="58" height="58" viewBox="0 0 58 58" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <!-- 外円 -->
+        <circle cx="29" cy="29" r="24" stroke="var(--accent)" stroke-width="1.8"/>
+        <!-- 内円 -->
+        <circle cx="29" cy="29" r="4" stroke="var(--accent)" stroke-width="1.5"/>
+        <!-- 中心点 -->
+        <circle cx="29" cy="29" r="1.5" fill="var(--accent)"/>
+        <!-- 目盛り（N/S/E/W） -->
+        <line x1="29" y1="5"  x2="29" y2="10" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round"/>
+        <line x1="29" y1="48" x2="29" y2="53" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round"/>
+        <line x1="5"  y1="29" x2="10" y2="29" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round"/>
+        <line x1="48" y1="29" x2="53" y2="29" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round"/>
+        <!-- 斜め目盛り（小） -->
+        <line x1="12.5" y1="12.5" x2="15.5" y2="15.5" stroke="var(--accent)" stroke-width="1.2" stroke-linecap="round" opacity="0.5"/>
+        <line x1="45.5" y1="12.5" x2="42.5" y2="15.5" stroke="var(--accent)" stroke-width="1.2" stroke-linecap="round" opacity="0.5"/>
+        <line x1="12.5" y1="45.5" x2="15.5" y2="42.5" stroke="var(--accent)" stroke-width="1.2" stroke-linecap="round" opacity="0.5"/>
+        <line x1="45.5" y1="45.5" x2="42.5" y2="42.5" stroke="var(--accent)" stroke-width="1.2" stroke-linecap="round" opacity="0.5"/>
+        <!-- 北針（上、細長い三角） -->
+        <path d="M29 8 L31.5 27 L29 25 L26.5 27 Z" fill="var(--accent)" stroke="var(--accent)" stroke-width="0.5" stroke-linejoin="round"/>
+        <!-- 南針（下、白抜き三角） -->
+        <path d="M29 50 L31.5 31 L29 33 L26.5 31 Z" fill="none" stroke="var(--accent)" stroke-width="1.3" stroke-linejoin="round"/>
+        <!-- N テキスト -->
+        <text x="29" y="4" text-anchor="middle" font-size="5" font-family="system-ui,sans-serif" font-weight="700" fill="var(--accent)">N</text>
+      </svg>
+    </div>
+    <h2>Kaisen Battle</h2>
+    <div style="margin-bottom:16px">
+      <p style="font-size:12px;font-weight:600;color:var(--label3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:10px">難易度</p>
+      <div class="seg-control" id="diff-seg">
+        <button class="seg-btn" id="diff-easy"   onclick="setDifficulty('easy')">Easy</button>
+        <button class="seg-btn active" id="diff-normal" onclick="setDifficulty('normal')">Normal</button>
+        <button class="seg-btn" id="diff-hard"   onclick="setDifficulty('hard')">Hard</button>
+        <button class="seg-btn" id="diff-expert" onclick="setDifficulty('expert')">Expert</button>
+      </div>
+    </div>
+    <button class="btn btn-primary" onclick="startGame('vs-cpu')">ゲームスタート</button>
+    <button class="btn btn-ghost" onclick="showRules()">ルールを確認</button>
+  </div>
+</div>
+
+<!-- ========== ルール ========== -->
+<div id="page-rules" class="page">
+  <div class="screen">
+    <div class="card">
+      <div class="card-title">艦隊</div>
+      <div class="rule-section"><p>空母（7マス・L字型）、護衛艦（4マス）、潜水艦×2（各1マス）を10×10の海図に配置</p></div>
+    </div>
+    <div class="card">
+      <div class="card-title">返答の記号</div>
+      <div class="rule-section">
+        <p>○ 本体に命中<br>△ 本体の周囲（角含む）<br>× 2マス以上離れている</p>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">勝利条件（いずれか）</div>
+      <div class="rule-section">
+        <p>A: 空母と護衛艦を全撃沈<br>B: 潜水艦2隻を命中<br>C: 相手の攻撃回数を0以下に</p>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">撃沈ボーナス（相手の攻撃を減らす）</div>
+      <div class="rule-section"><p>空母 −30回 ／ 護衛艦 −20回 ／ 潜水艦 −10回</p></div>
+    </div>
+    <div class="card">
+      <div class="card-title">迎撃</div>
+      <div class="rule-section"><p>護衛艦が生きていて残り攻撃11回以上の時、1回だけ潜水艦への攻撃を無効化＋移動できる。自分の攻撃 −10回。</p></div>
+    </div>
+    <button class="btn btn-secondary" onclick="showPage('page-title')">← 戻る</button>
+  </div>
+</div>
+
+<!-- ========== プレイヤー名 ========== -->
+<div id="page-names" class="page">
+  <div class="screen">
+    <div class="card">
+      <div class="card-title" id="names-card-title">プレイヤー名</div>
+      <label class="apple-label">あなたの名前</label>
+      <input id="p1name" type="text" value="艦長" class="apple-input">
+      <div id="p2name-row">
+        <label class="apple-label">プレイヤー 2</label>
+        <input id="p2name" type="text" value="艦長B" class="apple-input" style="margin-bottom:0">
+      </div>
+    </div>
+    <button class="btn btn-primary" onclick="confirmNames()">艦隊配置へ →</button>
+  </div>
+</div>
+
+<!-- ========== 配置 ========== -->
+<div id="page-placement" class="page">
+  <div class="screen">
+    <div class="card">
+      <div class="card-title" id="placement-title">艦隊配置</div>
+      <p style="font-size:13px;color:var(--label3);margin-bottom:12px">① 艦を選択 ② 向きを選択 ③ マスをタップして配置</p>
+      <div class="list-card ship-list" id="ship-list"></div>
+      <div class="seg-control" style="margin-top:12px">
+        <button class="seg-btn active" id="dir-h" onclick="setDir('h')">→ 横</button>
+        <button class="seg-btn" id="dir-v" onclick="setDir('v')">↓ 縦</button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">海図</div>
+      <div class="grid-wrap">
+        <div class="grid-container" id="place-grid"></div>
+      </div>
+    </div>
+    <div id="place-msg" class="banner banner-warn" style="display:none"></div>
+    <button class="btn btn-secondary" onclick="resetPlacement()">↺ リセット</button>
+    <button class="btn btn-primary" id="place-confirm" onclick="confirmPlacement()" disabled style="opacity:0.4">この配置で決定</button>
+  </div>
+</div>
+
+<!-- ========== パス ========== -->
+<div id="page-pass" class="page">
+  <div class="screen">
+    <div class="pass-icon">🔒</div>
+    <h2 id="pass-title">交代してください</h2>
+    <p id="pass-desc">次のプレイヤーに端末を渡し、準備ができたらタップ</p>
+    <button class="btn btn-primary" id="pass-btn" onclick="passConfirmed()">準備完了 →</button>
+  </div>
+</div>
+
+<!-- ========== 対戦 ========== -->
+<div id="page-battle" class="page">
+  <div class="screen">
+    <div class="status-pill-row">
+      <div class="status-pill">
+        <span class="pill-label">攻撃側</span>
+        <span class="pill-val accent" id="atk-player" style="font-size:15px;margin-top:2px">—</span>
+      </div>
+      <div class="status-pill">
+        <span class="pill-label">自分の残り攻撃</span>
+        <span class="pill-val" id="atk-remain">100</span>
+      </div>
+      <div class="status-pill" id="cpu-remain-pill" style="flex:0.8">
+        <span class="pill-label">敵の残り攻撃</span>
+        <span class="pill-val" id="cpu-remain" style="color:var(--red)">100</span>
+      </div>
+      <div class="status-pill" id="diff-pill" style="flex:0.7">
+        <span class="pill-label">難易度</span>
+        <span class="pill-val" id="diff-display" style="font-size:14px;margin-top:2px">—</span>
+      </div>
+    </div>
+
+    <div class="tab-bar">
+      <button class="tab active" id="tab-attack" onclick="switchTab('attack')">🎯 攻撃</button>
+      <button class="tab" id="tab-own" onclick="switchTab('own')">🛡 自陣</button>
+      <button class="tab" id="tab-log" onclick="switchTab('log')">📋 ログ</button>
+    </div>
+
+    <!-- 攻撃タブ -->
+    <div id="tab-content-attack">
+      <div id="battle-msg" class="banner banner-info"></div>
+
+      <!-- 座標宣言フェーズ -->
+      <div id="battle-phase-declare">
+        <div class="card">
+          <div class="card-title">攻撃座標を選択</div>
+          <div class="select-row">
+            <select id="sel-col" class="apple-select" onchange="onSelectChange()">
+              <option value="">列</option>
+              <option>A</option><option>B</option><option>C</option><option>D</option><option>E</option>
+              <option>F</option><option>G</option><option>H</option><option>I</option><option>J</option>
+            </select>
+            <select id="sel-row" class="apple-select" onchange="onSelectChange()">
+              <option value="">行</option>
+              <option>1</option><option>2</option><option>3</option><option>4</option><option>5</option>
+              <option>6</option><option>7</option><option>8</option><option>9</option><option>10</option>
+            </select>
+          </div>
+          <button class="btn btn-primary" onclick="declareAttack()">攻撃宣言 →</button>
+        </div>
+        <div class="card">
+          <div class="card-title">敵海図（推測）</div>
+          <div class="legend">
+            <div class="legend-item"><div class="legend-dot ld-hit"></div>○ 命中</div>
+            <div class="legend-item"><div class="legend-dot ld-near"></div>△ 波高し</div>
+            <div class="legend-item"><div class="legend-dot ld-miss"></div>× はずれ</div>
+          </div>
+          <div class="grid-wrap">
+            <div class="grid-container" id="enemy-grid"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 返答フェーズ -->
+      <div id="battle-phase-response" style="display:none">
+        <div class="card">
+          <div class="card-title" id="resp-panel-title">守備側：結果を入力</div>
+          <p style="font-size:14px;color:var(--label2);margin-bottom:4px" id="resp-coord-display"></p>
+          <div class="response-grid">
+            <button class="resp-btn resp-hit"  onclick="submitResponse('hit')">○<span>命中</span></button>
+            <button class="resp-btn resp-near" onclick="submitResponse('near')">△<span>波高し</span></button>
+            <button class="resp-btn resp-miss" onclick="submitResponse('miss')">×<span>はずれ</span></button>
+          </div>
+        </div>
+        <div id="intercept-available" style="display:none">
+          <div class="banner banner-warn">
+            <span class="banner-icon">⚡</span>
+            <span><strong>迎撃可能</strong><br>護衛艦が生存中。自分の攻撃 −10回と引き換えに潜水艦への命中を無効化できます。</span>
+          </div>
+          <button class="btn btn-danger" onclick="doIntercept()">⚡ 迎撃する（−10回）</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 自陣タブ -->
+    <div id="tab-content-own" style="display:none">
+      <div class="card">
+        <div class="card-title">自陣マップ</div>
+        <div class="grid-wrap">
+          <div class="grid-container" id="own-grid"></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">艦隊状況</div>
+        <div id="ship-status"></div>
+      </div>
+    </div>
+
+    <!-- ログタブ -->
+    <div id="tab-content-log" style="display:none">
+      <div class="card">
+        <div class="card-title">残り攻撃回数</div>
+        <div class="counter-grid" id="attack-counter"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">戦闘ログ</div>
+        <div id="battle-log" style="max-height:240px;overflow-y:auto"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ========== 結果 ========== -->
+<div id="page-result" class="page">
+  <div class="screen">
+    <div class="result-trophy">🏆</div>
+    <div class="result-title" id="result-title"></div>
+    <div class="result-desc" id="result-desc"></div>
+    <div class="card" id="result-stats"></div>
+    <button class="btn btn-primary" onclick="location.reload()" style="margin-top:16px">もう一度プレイ</button>
+  </div>
+</div>
+
+<!-- ========== モーダル ========== -->
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <h2 id="modal-title">確認</h2>
+    <p id="modal-body"></p>
+    <div class="modal-btns">
+      <button class="btn btn-secondary" onclick="closeModal()">キャンセル</button>
+      <button class="btn btn-primary" onclick="modalOk()">OK</button>
+    </div>
+  </div>
+</div>
+
+<script>
+
+// ==============================
+// テーマ定義（デジタル庁カラーパレット準拠）
+// ==============================
+const WHITE_BASE = {
+  bg:'#f2f2f7', surface:'#ffffff', surface2:'#f2f2f7', surface3:'#e5e5ea',
+  textColor:'#000000', label2:'#3c3c43', label3:'#8e8e93',
+  sep:'rgba(60,60,67,0.12)', sep2:'rgba(60,60,67,0.06)',
+  green:'#34c759', red:'#ff3b30', orange:'#ff9500',
+  hitBg:'#fff1f0', nearBg:'#fff8ec', missBg:'#f2f2f7',
+};
+
+// アクセントカラーのみ定義（背景は常に白ベース）
+const THEMES = {
+  blue:   { accent:'#007aff', accentDark:'#0062cc', cellShip:'rgba(0,122,255,0.18)',   name:'Blue'   },
+  cyan:   { accent:'#32ade6', accentDark:'#1a8fc0', cellShip:'rgba(50,173,230,0.18)',  name:'Cyan'   },
+  green:  { accent:'#34c759', accentDark:'#248a3d', cellShip:'rgba(52,199,89,0.18)',   name:'Green'  },
+  orange: { accent:'#ff9500', accentDark:'#c97000', cellShip:'rgba(255,149,0,0.18)',   name:'Orange' },
+  red:    { accent:'#ff3b30', accentDark:'#c0170e', cellShip:'rgba(255,59,48,0.18)',   name:'Red'    },
+  purple: { accent:'#af52de', accentDark:'#8944b8', cellShip:'rgba(175,82,222,0.18)',  name:'Purple' },
+  teal:   { accent:'#5ac8fa', accentDark:'#0a84ff', cellShip:'rgba(90,200,250,0.18)',  name:'Teal'   },
+};
+
+let currentTheme = 'blue';
+
+function setTheme(name) {
+  const t = THEMES[name];
+  if (!t) return;
+  currentTheme = name;
+  const r = document.documentElement;
+  // 白ベースは常に固定
+  r.style.setProperty('--bg',          WHITE_BASE.bg);
+  r.style.setProperty('--surface',     WHITE_BASE.surface);
+  r.style.setProperty('--surface2',    WHITE_BASE.surface2);
+  r.style.setProperty('--surface3',    WHITE_BASE.surface3);
+  r.style.setProperty('--label',       WHITE_BASE.textColor);
+  r.style.setProperty('--label2',      WHITE_BASE.label2);
+  r.style.setProperty('--label3',      WHITE_BASE.label3);
+  r.style.setProperty('--sep',         WHITE_BASE.sep);
+  r.style.setProperty('--sep2',        WHITE_BASE.sep2);
+  r.style.setProperty('--green',       WHITE_BASE.green);
+  r.style.setProperty('--red',         WHITE_BASE.red);
+  r.style.setProperty('--orange',      WHITE_BASE.orange);
+  r.style.setProperty('--hit-bg',      WHITE_BASE.hitBg);
+  r.style.setProperty('--near-bg',     WHITE_BASE.nearBg);
+  r.style.setProperty('--miss-bg',     WHITE_BASE.missBg);
+  r.style.setProperty('--cell-bg',     WHITE_BASE.cellBg);
+  // アクセントカラーのみテーマに従う
+  r.style.setProperty('--accent',      t.accent);
+  r.style.setProperty('--accent-rgb',  hexToRgb(t.accent));
+  r.style.setProperty('--accent-dark', t.accentDark);
+  r.style.setProperty('--cell-ship',   t.cellShip);
+  // マス目背景もアクセントカラーから生成
+  const [ar, ag, ab] = hexToRgbArr(t.accent);
+  r.style.setProperty('--cell-bg',   `rgba(${ar},${ag},${ab},0.06)`);
+  // ボタンのactiveを更新
+  document.querySelectorAll('.theme-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.id === 'theme-' + name);
+  });
+}
+
+function hexToRgb(hex) {
+  const r = parseInt(hex.slice(1,3),16);
+  const g = parseInt(hex.slice(3,5),16);
+  const b = parseInt(hex.slice(5,7),16);
+  return `${r},${g},${b}`;
+}
+
+function hexToRgbArr(hex) {
+  return [
+    parseInt(hex.slice(1,3),16),
+    parseInt(hex.slice(3,5),16),
+    parseInt(hex.slice(5,7),16),
+  ];
+}
+
+// ==============================
+// ゲーム状態
+// ==============================
+const COLS = ['A','B','C','D','E','F','G','H','I','J'];
+const ROWS = ['1','2','3','4','5','6','7','8','9','10'];
+
+const SHIPS = [
+  { id: 'carrier', name: '空母', size: 7, penalty: 30, shaped: true },
+  { id: 'escort',  name: '護衛艦', size: 4, penalty: 20 },
+  { id: 'sub1',    name: '潜水艦 X', size: 1, penalty: 10 },
+  { id: 'sub2',    name: '潜水艦 Z', size: 1, penalty: 10 },
+];
+
+// 空母のL字形オフセット（基準点からの相対座標）
+// 回転0: 上3マス横 + 左端から下4マス縦
+//   ██░
+//   █░░
+//   █░░
+//   █░░
+// rotation: 0=上L, 1=右L, 2=下L(逆), 3=左L
+function getCarrierOffsets(rotation) {
+  switch(rotation) {
+    case 0: // 上が横3、左縦4（画像の形）
+      return [[0,0],[1,0],[2,0],[0,1],[0,2],[0,3],[0,4]]; // 待って画像を再確認
+    case 1: // 90度右回転
+      return [[0,0],[0,1],[0,2],[0,3],[1,3],[2,3],[3,3]];
+    case 2: // 180度
+      return [[0,0],[1,0],[2,0],[3,0],[3,1],[3,2],[3,3]];
+    case 3: // 270度
+      return [[0,0],[1,0],[2,0],[3,0],[0,1],[0,2],[0,3]]; // 再確認
+    default: return [];
+  }
+}
+
+// 画像確認: 上部に3マス横（右方向）、下部左端から4マス縦（下方向）
+// 実際の形:
+//   ██    (row0: col0,col1,col2 → 3マス横)
+//   █     (row1: col0のみ)
+//   █     (row2: col0のみ)
+//   █     (row3: col0のみ)
+// → offsets: [0,0][1,0][2,0][0,1][0,2][0,3] = 6マス → 7マスになるよう確認
+// 画像は7マス: 上3横 + 縦4（うち1マスは上と共有）→ 実は上行3マス + 左列4マス = 3+4-1=6？
+// いや、7マスなので: 上行3 + 左列（残り4）= 7マス
+// 上行: [0,0][1,0][2,0]  左列: [0,0][0,1][0,2][0,3] → 重複[0,0]除くと6マス
+// → 上行3 + 左列5 = 7? 再度: 上3横 + 下4縦（上のマスは別）
+// 正しい解釈: 縦4マス + 右上3マス（縦の一番上の右に2マス追加）= 4+3=7
+// [0,0][0,1][0,2][0,3] + [1,0][2,0][3,0] → 上にT字? 
+// → 画像を見ると左列4縦 + 右上横2 = L字7マス
+// [0,0][0,1][0,2][0,3][1,0][2,0] = 6マス → まだ6
+// 7マス: 左列4 + 上行4(重複1) = 7: [0,0][0,1][0,2][0,3][1,0][2,0][3,0]
+
+function getCarrierShape(rotation) {
+  // 基本形:
+  // ■ 　  (0,0)
+  // ■ ■  (0,1)(1,1)
+  // ■ ■  (0,2)(1,2)
+  // ■ ■  (0,3)(1,3)
+  const base = [[0,0],[0,1],[1,1],[0,2],[1,2],[0,3],[1,3]];
+  return rotateShape(base, rotation);
+}
+
+function rotateShape(offsets, rotation) {
+  let cells = offsets;
+  for (let r = 0; r < rotation; r++) {
+    // 90度時計回り: (x,y) → (maxY-y, x)
+    const maxY = Math.max(...cells.map(([x,y]) => y));
+    cells = cells.map(([x,y]) => [maxY - y, x]);
+    // 正規化（最小値を0に）
+    const minX = Math.min(...cells.map(([x]) => x));
+    const minY = Math.min(...cells.map(([,y]) => y));
+    cells = cells.map(([x,y]) => [x-minX, y-minY]);
+  }
+  return cells;
+}
+
+// 配置セルが既存の船と隣接（上下左右斜め）していないか確認
+function hasAdjacency(newCells, existingCells) {
+  return newCells.some(([nc, nr]) =>
+    existingCells.some(([ec, er]) =>
+      Math.abs(nc - ec) <= 1 && Math.abs(nr - er) <= 1
+    )
+  );
+}
+
+function getShipCells(ci, ri, size, dir, shipId) {
+  if (shipId === 'carrier') {
+    return getCarrierCells(ci, ri, placementState.rotation);
+  }
+  const cells = [];
+  for (let i = 0; i < size; i++) {
+    const nc = dir === 'h' ? ci + i : ci;
+    const nr = dir === 'v' ? ri + i : ri;
+    if (nc >= 10 || nr >= 10) return null;
+    cells.push([nc, nr]);
+  }
+  return cells;
+}
+
+function getCarrierCells(ci, ri, rotation) {
+  const offsets = getCarrierShape(rotation);
+  const cells = offsets.map(([dx,dy]) => [ci+dx, ri+dy]);
+  if (cells.some(([nc,nr]) => nc >= 10 || nr >= 10 || nc < 0 || nr < 0)) return null;
+  return cells;
+}
+
+let state = {
+  players: ['艦長', '敵'],
+  mode: 'vs-cpu', // 'vs-cpu' | 'vs-human'
+  difficulty: 'normal', // 'easy' | 'normal' | 'hard'
+  currentPlayer: 0, // 0=人間, 1=敵(vs-cpuモード)
+  phase: 'placement',
+  placementPlayer: 0,
+  playerData: [null, null],
+  attackPhase: 'declare',
+  pendingCoord: null,
+  battleLog: [],
+  turnCount: 0,
+};
+
+function initPlayerData() {
+  return {
+    grid: Array(10).fill(null).map(() => Array(10).fill(null)), // null | {shipId} | attacked flag etc
+    ships: SHIPS.map(s => ({ ...s, cells: [], sunk: false })),
+    attacks: [], // { coord, result } received attacks
+    myAttacks: [], // { coord, result } my attacks on enemy
+    attacksLeft: 100,
+    attacksUsed: 0,
+    interceptUsed: false,
+    placedShips: {},
+  };
+}
+
+// ==============================
+// ページ管理
+// ==============================
+function showPage(id) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function showRules() { showPage('page-rules'); }
+
+function startGame(mode) {
+  state.mode = mode || 'vs-cpu';
+  state.players[0] = 'あなた';
+  state.players[1] = '敵';
+  state.playerData[0] = initPlayerData();
+  state.playerData[1] = initPlayerData();
+  if (state.mode === 'vs-cpu') {
+    cpuPlaceShips();
+  }
+  state.placementPlayer = 0;
+  startPlacement(0);
+}
+
+function confirmNames() {
+  state.players[0] = document.getElementById('p1name').value || '艦長';
+  state.players[1] = state.mode === 'vs-cpu' ? '敵' : (document.getElementById('p2name').value || '艦長B');
+  state.playerData[0] = initPlayerData();
+  state.playerData[1] = initPlayerData();
+  state.placementPlayer = 0;
+  if (state.mode === 'vs-cpu') {
+    // 敵の艦隊をランダム配置してから人間の配置へ
+    cpuPlaceShips();
+    startPlacement(0);
+  } else {
+    startPlacement(0);
+  }
+}
+
+// ==============================
+// 配置フェーズ
+// ==============================
+let placementState = {
+  selectedShip: null,
+  direction: 'h',
+  rotation: 0,
+  preview: [],
+};
+
+function startPlacement(playerIdx) {
+  state.placementPlayer = playerIdx;
+  document.getElementById('placement-title').textContent =
+    `🚢 ${state.players[playerIdx]}の艦隊配置`;
+  placementState.selectedShip = null;
+  placementState.direction = 'h';
+  placementState.rotation = 0;
+  placementState.preview = [];
+  document.getElementById('dir-h').classList.add('active');
+  document.getElementById('dir-v').classList.remove('active');
+  const pcBtn = document.getElementById('place-confirm');
+  pcBtn.disabled = true;
+  pcBtn.style.opacity = '0.4';
+  document.getElementById('place-msg').style.display = 'none';
+  renderShipList();
+  updateDirButtons();
+  renderPlaceGrid();
+  showPage('page-placement');
+  updatePhaseLabel('配置：' + state.players[playerIdx]);
+}
+
+function renderShipList() {
+  const pd = state.playerData[state.placementPlayer];
+  const list = document.getElementById('ship-list');
+  list.innerHTML = '';
+  pd.ships.forEach(ship => {
+    const div = document.createElement('div');
+    div.className = 'ship-item' +
+      (ship.cells.length > 0 ? ' placed' : '') +
+      (placementState.selectedShip === ship.id && ship.cells.length === 0 ? ' selected' : '');
+    div.onclick = () => {
+      if (ship.cells.length > 0) return;
+      placementState.selectedShip = ship.id;
+      placementState.rotation = 0;
+      updateDirButtons();
+      renderShipList();
+      renderPlaceGrid();
+    };
+    const dots = Array(ship.size).fill('<div class="dot"></div>').join('');
+    div.innerHTML = `<span class="ship-name">${ship.name}（${ship.size}マス）${ship.cells.length > 0 ? ' ✓' : ''}</span><div class="ship-size-dots">${dots}</div>`;
+    list.appendChild(div);
+  });
+}
+
+function setDir(d) {
+  if (placementState.selectedShip === 'carrier') {
+    // 空母は4方向回転
+    if (d === 'rot') {
+      placementState.rotation = (placementState.rotation + 1) % 4;
+    }
+  } else {
+    placementState.direction = d;
+    document.getElementById('dir-h').classList.toggle('active', d === 'h');
+    document.getElementById('dir-v').classList.toggle('active', d === 'v');
+  }
+  updateDirButtons();
+  renderPlaceGrid();
+}
+
+function updateDirButtons() {
+  const isCarrier = placementState.selectedShip === 'carrier';
+  const dirH = document.getElementById('dir-h');
+  const dirV = document.getElementById('dir-v');
+  if (isCarrier) {
+    const shapeLabels = ['L字（標準）','L字（右90°）','L字（180°）','L字（左90°）'];
+    dirH.textContent = '現在: ' + shapeLabels[placementState.rotation];
+    dirH.classList.add('active');
+    dirV.classList.remove('active');
+    dirV.textContent = '↻ 向きを変える';
+    dirV.onclick = () => setDir('rot');
+    dirH.onclick = null;
+  } else {
+    dirH.textContent = '→ 横';
+    dirV.textContent = '↓ 縦';
+    dirH.onclick = () => setDir('h');
+    dirV.onclick = () => setDir('v');
+    dirH.classList.toggle('active', placementState.direction === 'h');
+    dirV.classList.toggle('active', placementState.direction === 'v');
+  }
+}
+
+function makeHeader(text) {
+  const d = document.createElement('div');
+  d.className = 'grid-header';
+  d.textContent = text;
+  return d;
+}
+
+// グリッドセルラベル
+const SHIP_LABELS = { carrier:'空', escort:'護', sub1:'潜', sub2:'潜' };
+
+// プレビュー状態（再描画なしでスタイル制御）
+let previewCells = [];
+let previewValid = false;
+
+function renderPlaceGrid() {
+  const pd = state.playerData[state.placementPlayer];
+  const grid = document.getElementById('place-grid');
+  grid.innerHTML = '';
+  previewCells = [];
+
+  // ヘッダー行
+  grid.appendChild(makeHeader(''));
+  COLS.forEach(c => grid.appendChild(makeHeader(c)));
+
+  ROWS.forEach((r, ri) => {
+    grid.appendChild(makeHeader(r));
+    COLS.forEach((c, ci) => {
+      const cell = document.createElement('div');
+      cell.className = 'cell';
+      cell.dataset.ci = ci;
+      cell.dataset.ri = ri;
+
+      const shipHere = pd.ships.find(s => s.cells.some(cl => cl[0] === ci && cl[1] === ri));
+      if (shipHere) {
+        cell.classList.add('ship');
+        cell.textContent = SHIP_LABELS[shipHere.id] || '艦';
+        cell.style.fontWeight = '700';
+        cell.style.fontSize = '10px';
+      }
+
+      // タッチ・マウス両対応
+      cell.addEventListener('pointerenter', () => updatePreview(ci, ri));
+      cell.addEventListener('pointerleave', () => clearPreview());
+      cell.addEventListener('click', () => placeShip(ci, ri));
+      grid.appendChild(cell);
+    });
+  });
+}
+
+function updatePreview(ci, ri) {
+  if (!placementState.selectedShip) return;
+  const pd = state.playerData[state.placementPlayer];
+  const ship = pd.ships.find(s => s.id === placementState.selectedShip);
+  if (!ship || ship.cells.length > 0) return;
+
+  // 前のプレビューを消す
+  clearPreviewStyle();
+
+  const cells = getShipCells(ci, ri, ship.size, placementState.direction, ship.id);
+  if (!cells) return;
+
+  const occupied = pd.ships.flatMap(s => s.cells);
+  const valid = cells.every(([nc, nr]) =>
+    !occupied.some(([oc, or]) => oc === nc && or === nr) && nc < 10 && nr < 10
+  ) && !hasAdjacency(cells, occupied);
+
+  previewCells = cells;
+  previewValid = valid;
+
+  const grid = document.getElementById('place-grid');
+  cells.forEach(([nc, nr]) => {
+    const cell = grid.querySelector(`[data-ci="${nc}"][data-ri="${nr}"]`);
+    if (cell && !cell.classList.contains('ship')) {
+      cell.style.background = valid
+        ? 'rgba(0,122,255,0.18)'
+        : 'rgba(255,59,48,0.15)';
+      cell.style.outline = `2px solid ${valid ? 'var(--accent)' : 'var(--red)'}`;
+      cell.style.outlineOffset = '-1px';
+    }
+  });
+}
+
+function clearPreviewStyle() {
+  if (!previewCells.length) return;
+  const grid = document.getElementById('place-grid');
+  previewCells.forEach(([nc, nr]) => {
+    const cell = grid.querySelector(`[data-ci="${nc}"][data-ri="${nr}"]`);
+    if (cell && !cell.classList.contains('ship')) {
+      cell.style.background = '';
+      cell.style.outline = '';
+      cell.style.outlineOffset = '';
+    }
+  });
+  previewCells = [];
+}
+
+function clearPreview() {
+  clearPreviewStyle();
+}
+
+function placeShip(ci, ri) {
+  if (!placementState.selectedShip) return;
+  const pd = state.playerData[state.placementPlayer];
+  const ship = pd.ships.find(s => s.id === placementState.selectedShip);
+  if (!ship || ship.cells.length > 0) return;
+
+  const cells = getShipCells(ci, ri, ship.size, placementState.direction, ship.id);
+  if (!cells) { showPlaceMsg('マス外に配置できません', 'warn'); return; }
+
+  const occupied = pd.ships.flatMap(s => s.cells);
+  const overlap = cells.some(([nc, nr]) => occupied.some(([oc, or]) => oc === nc && or === nr));
+  if (overlap) { showPlaceMsg('他の船と重なっています', 'warn'); return; }
+  if (hasAdjacency(cells, occupied)) { showPlaceMsg('他の船と隣接しています', 'warn'); return; }
+
+  ship.cells = cells;
+  placementState.selectedShip = null;
+
+  const allPlaced = pd.ships.every(s => s.cells.length > 0);
+  const confirmBtn = document.getElementById('place-confirm');
+  confirmBtn.disabled = !allPlaced;
+  confirmBtn.style.opacity = allPlaced ? '1' : '0.4';
+  if (allPlaced) showPlaceMsg('全艦配置完了！「決定」ボタンを押してください', '');
+
+  renderShipList();
+  renderPlaceGrid();
+}
+
+function showPlaceMsg(text, type) {
+  const el = document.getElementById('place-msg');
+  el.style.display = 'block';
+  el.className = 'banner ' + (type === 'warn' ? 'banner-warn' : type === 'danger' ? 'banner-danger' : 'banner-info');
+  el.textContent = text;
+}
+
+function resetPlacement() {
+  const pd = state.playerData[state.placementPlayer];
+  pd.ships.forEach(s => s.cells = []);
+  placementState.selectedShip = null;
+  const pcBtn = document.getElementById('place-confirm');
+  pcBtn.disabled = true;
+  pcBtn.style.opacity = '0.4';
+  document.getElementById('place-msg').style.display = 'none';
+  renderShipList();
+  renderPlaceGrid();
+}
+
+function confirmPlacement() {
+  const pd = state.playerData[state.placementPlayer];
+  if (!pd.ships.every(s => s.cells.length > 0)) return;
+
+  if (state.mode === 'vs-cpu') {
+    // 敵対戦：人間の配置のみ → そのまま対戦開始
+    state.currentPlayer = 0;
+    state.phase = 'battle';
+    startBattle();
+  } else {
+    // 2人対戦
+    if (state.placementPlayer === 0) {
+      showPassScreen(
+        `${state.players[1]}へ交代`,
+        `端末を${state.players[1]}に渡し、艦隊配置を行ってください。`,
+        () => startPlacement(1)
+      );
+    } else {
+      state.currentPlayer = 0;
+      state.phase = 'battle';
+      showPassScreen(
+        `${state.players[0]}へ交代`,
+        `対戦を開始します。${state.players[0]}（攻撃側）に端末を渡してください。`,
+        () => startBattle()
+      );
+    }
+  }
+}
+
+// ==============================
+// パス画面
+// ==============================
+let passCallback = null;
+function showPassScreen(title, desc, cb) {
+  passCallback = cb;
+  document.getElementById('pass-title').textContent = title;
+  document.getElementById('pass-desc').textContent = desc;
+  showPage('page-pass');
+}
+function passConfirmed() {
+  if (passCallback) { passCallback(); passCallback = null; }
+}
+
+// ==============================
+// 対戦フェーズ
+// ==============================
+function startBattle() {
+  renderBattle();
+  showPage('page-battle');
+  updatePhaseLabel('対戦中');
+  // 難易度表示
+  const labels = { easy:'Easy 🌱', normal:'Normal ⚔️', hard:'Hard 🔥', expert:'Expert 🤖' };
+  const el = document.getElementById('diff-display');
+  if (el) el.textContent = labels[state.difficulty] || '';
+  const pill = document.getElementById('diff-pill');
+  if (pill) pill.style.display = state.mode === 'vs-cpu' ? '' : 'none';
+  const cpuPill = document.getElementById('cpu-remain-pill');
+  if (cpuPill) cpuPill.style.display = state.mode === 'vs-cpu' ? '' : 'none';
+}
+
+function renderBattle() {
+  const atk = state.currentPlayer;
+  const def = 1 - atk;
+  const pd = state.playerData[atk];
+
+  document.getElementById('atk-player').textContent = state.players[atk];
+  if (state.mode === 'vs-cpu') {
+    // 敵対戦：人間の残り攻撃を常に表示、敵の残り攻撃も表示
+    document.getElementById('atk-remain').textContent = state.playerData[0].attacksLeft;
+    const cpuRemainEl = document.getElementById('cpu-remain');
+    if (cpuRemainEl) cpuRemainEl.textContent = state.playerData[1].attacksLeft;
+  } else {
+    document.getElementById('atk-remain').textContent = pd.attacksLeft;
+  }
+
+  renderEnemyGrid();
+  renderOwnGrid();
+  renderShipStatus();
+  renderAttackCounter();
+  renderLog();
+
+  if (state.mode === 'vs-cpu') {
+    if (state.currentPlayer === 0) {
+      setBattleMsg('あなたの攻撃ターンです。座標を選んで攻撃宣言してください。');
+      document.getElementById('battle-phase-declare').style.display = 'block';
+      document.getElementById('battle-phase-response').style.display = 'none';
+    } else {
+      setBattleMsg('🤖 敵が攻撃中...', 'warn');
+      document.getElementById('battle-phase-declare').style.display = 'none';
+      document.getElementById('battle-phase-response').style.display = 'none';
+    }
+  } else {
+    setBattleMsg(`${state.players[atk]} の攻撃ターンです。座標を選んで攻撃宣言してください。`);
+    document.getElementById('battle-phase-declare').style.display = 'block';
+    document.getElementById('battle-phase-response').style.display = 'none';
+  }
+  switchTab('attack');
+}
+
+function renderEnemyGrid() {
+  const atk = state.currentPlayer;
+  const pd = state.playerData[atk];
+  const grid = document.getElementById('enemy-grid');
+  grid.innerHTML = '';
+  grid.appendChild(makeHeader(''));
+  COLS.forEach(c => grid.appendChild(makeHeader(c)));
+
+  // 現在の選択座標
+  const selCol = document.getElementById('sel-col').value;
+  const selRow = document.getElementById('sel-row').value;
+  const selCi = selCol ? COLS.indexOf(selCol) : -1;
+  const selRi = selRow ? ROWS.indexOf(selRow) : -1;
+
+  ROWS.forEach((r, ri) => {
+    grid.appendChild(makeHeader(r));
+    COLS.forEach((c, ci) => {
+      const cell = document.createElement('div');
+      cell.className = 'cell';
+      cell.dataset.ci = ci;
+      cell.dataset.ri = ri;
+
+      const myAtk = pd.myAttacks.find(a => a.coord[0] === ci && a.coord[1] === ri);
+      if (myAtk) {
+        if (myAtk.result === 'hit')  { cell.classList.add('hit');  cell.textContent = '○'; }
+        if (myAtk.result === 'near') { cell.classList.add('near'); cell.textContent = '△'; }
+        if (myAtk.result === 'miss') { cell.classList.add('miss'); cell.textContent = '×'; }
+      } else {
+        // 選択中のセルにハイライト
+        const isSelected = (ci === selCi && ri === selRi);
+        if (isSelected) {
+          cell.classList.add('target-selected');
+        }
+        cell.addEventListener('click', () => {
+          quickSelect(ci, ri);
+          highlightTargetCell(ci, ri);
+        });
+        cell.style.cursor = 'pointer';
+      }
+      grid.appendChild(cell);
+    });
+  });
+}
+
+// グリッドを再描画せず選択セルのスタイルだけ更新
+function highlightTargetCell(selCi, selRi) {
+  const grid = document.getElementById('enemy-grid');
+  grid.querySelectorAll('.cell').forEach(cell => {
+    const ci = parseInt(cell.dataset.ci);
+    const ri = parseInt(cell.dataset.ri);
+    if (isNaN(ci) || isNaN(ri)) return;
+    if (cell.classList.contains('hit') || cell.classList.contains('near') || cell.classList.contains('miss')) return;
+    if (ci === selCi && ri === selRi) {
+      cell.classList.add('target-selected');
+      cell.textContent = '';
+      cell.style.background = 'var(--accent)';
+    } else {
+      cell.classList.remove('target-selected');
+      cell.textContent = '';
+      cell.style.background = '';
+    }
+  });
+}
+
+function quickSelect(ci, ri) {
+  document.getElementById('sel-col').value = COLS[ci];
+  document.getElementById('sel-row').value = ROWS[ri];
+}
+
+function renderOwnGrid() {
+  // 自陣は常に人間(index 0)を表示
+  const atk = (state.mode === 'vs-cpu') ? 0 : state.currentPlayer;
+  const pd = state.playerData[atk];
+  const grid = document.getElementById('own-grid');
+  grid.innerHTML = '';
+  grid.appendChild(makeHeader(''));
+  COLS.forEach(c => grid.appendChild(makeHeader(c)));
+  ROWS.forEach((r, ri) => {
+    grid.appendChild(makeHeader(r));
+    COLS.forEach((c, ci) => {
+      const cell = document.createElement('div');
+      cell.className = 'cell';
+      cell.dataset.ci = ci;
+      cell.dataset.ri = ri;
+      const shipHere = pd.ships.find(s => s.cells.some(cl => cl[0] === ci && cl[1] === ri));
+      if (shipHere) {
+        cell.classList.add('ship');
+        const attacked = pd.attacks.some(a => a.coord[0] === ci && a.coord[1] === ri);
+        if (attacked) {
+          cell.classList.add('hit');
+          cell.textContent = '○';
+        } else {
+          cell.textContent = shipHere.id === 'carrier' ? '空' : shipHere.id === 'escort' ? '護' : '潜';
+          cell.style.color = 'var(--gold)';
+          cell.style.fontSize = '0.65rem';
+        }
+      } else {
+        const attacked = pd.attacks.find(a => a.coord[0] === ci && a.coord[1] === ri);
+        if (attacked) {
+          cell.classList.add(attacked.result === 'near' ? 'near' : 'miss');
+          cell.textContent = attacked.result === 'near' ? '△' : '×';
+        }
+      }
+      grid.appendChild(cell);
+    });
+  });
+}
+
+function renderShipStatus() {
+  // 自陣状況は常に人間(index 0)を表示
+  const atk = (state.mode === 'vs-cpu') ? 0 : state.currentPlayer;
+  const pd = state.playerData[atk];
+  const el = document.getElementById('ship-status');
+  el.innerHTML = '';
+  pd.ships.forEach(ship => {
+    const hitCount = ship.cells.filter(([ci, ri]) =>
+      pd.attacks.some(a => a.coord[0] === ci && a.coord[1] === ri)
+    ).length;
+    const sunk = hitCount >= ship.size;
+    const row = document.createElement('div');
+    row.className = 'ship-status-row';
+    row.innerHTML = `<span class="ship-status-name">${ship.name}</span>
+      <span class="ship-status-val ${sunk ? 'dead' : 'alive'}">${sunk ? '撃沈' : `${hitCount}/${ship.size}`}</span>`;
+    el.appendChild(row);
+  });
+}
+
+function renderAttackCounter() {
+  // 敵対戦時は常に人間(0)を表示
+  const idx = (state.mode === 'vs-cpu') ? 0 : state.currentPlayer;
+  const pd = state.playerData[idx];
+  const el = document.getElementById('attack-counter');
+  el.innerHTML = '';
+  for (let i = 1; i <= 100; i++) {
+    const cell = document.createElement('div');
+    cell.className = 'cnt-cell';
+    cell.textContent = i % 10 === 0 ? i : i % 10;
+    // 使用済み：前から塗る
+    if (i <= pd.attacksUsed) { cell.classList.add('used'); }
+    // 撃沈ボーナスで失った分：後ろから消す
+    else if (i > pd.attacksLeft) { cell.classList.add('lost'); }
+    el.appendChild(cell);
+  }
+}
+
+function renderLog() {
+  const el = document.getElementById('battle-log');
+  el.innerHTML = state.battleLog.slice(-20).reverse().map(l => `<div class="log-item">${l}</div>`).join('');
+}
+
+function setBattleMsg(text, type) {
+  const el = document.getElementById('battle-msg');
+  el.className = 'banner ' + (type === 'warn' ? 'banner-warn' : type === 'danger' ? 'banner-danger' : 'banner-info');
+  el.textContent = text;
+}
+
+function switchTab(tab) {
+  ['attack','own','log'].forEach(t => {
+    document.getElementById('tab-' + t).classList.toggle('active', t === tab);
+    document.getElementById('tab-content-' + t).style.display = t === tab ? 'block' : 'none';
+  });
+}
+
+// ==============================
+// 攻撃宣言
+// ==============================
+function declareAttack() {
+  const col = document.getElementById('sel-col').value;
+  const row = document.getElementById('sel-row').value;
+  if (!col || !row) { setBattleMsg('座標を選択してください', 'warn'); return; }
+
+  const ci = COLS.indexOf(col);
+  const ri = ROWS.indexOf(row);
+  const coord = `${col}${row}`;
+
+  const pd = state.playerData[state.currentPlayer];
+  if (pd.myAttacks.some(a => a.coord[0] === ci && a.coord[1] === ri)) {
+    setBattleMsg(`${coord} はすでに攻撃済みです`, 'warn');
+    return;
+  }
+
+  state.pendingCoord = [ci, ri];
+
+  if (state.mode === 'vs-cpu') {
+    // 敵対戦：自動で結果を計算して即表示
+    const result = calcAttackResult(1, ci, ri); // defは敵(index 1)
+    humanAttackResult(ci, ri, result);
+  } else {
+    // 2人対戦：守備側に渡す
+    const def = 1 - state.currentPlayer;
+    showPassScreen(
+      `${state.players[def]}へ交代`,
+      `${state.players[state.currentPlayer]}が「${coord}」を攻撃しました。${state.players[def]}（守備側）に端末を渡し、返答してください。`,
+      () => showResponsePhase(coord)
+    );
+  }
+}
+
+function showResponsePhase(coord) {
+  const def = 1 - state.currentPlayer;
+  const defPd = state.playerData[def];
+
+  // 迎撃可能チェック（潜水艦への命中かつ護衛艦生存かつ自残11以上かつ未使用）
+  const [ci, ri] = state.pendingCoord;
+  const hitSub = defPd.ships.filter(s => (s.id === 'sub1' || s.id === 'sub2'))
+    .some(s => s.cells.some(([sc, sr]) => sc === ci && sr === ri));
+  const escortAlive = !isShipSunk(def, 'escort');
+  const canIntercept = hitSub && escortAlive && defPd.attacksLeft >= 11 && !defPd.interceptUsed;
+
+  document.getElementById('resp-panel-title').textContent =
+    `🛡 ${state.players[def]}（守備側）：返答を入力`;
+  document.getElementById('resp-coord-display').textContent =
+    `攻撃座標：${coord}　自分の海図を確認して返答してください`;
+
+  document.getElementById('intercept-available').style.display = canIntercept ? 'block' : 'none';
+
+  document.getElementById('battle-phase-declare').style.display = 'none';
+  document.getElementById('battle-phase-response').style.display = 'block';
+  showPage('page-battle');
+  setBattleMsg(`${state.players[def]} が「${coord}」の結果を確認中...`, 'warn');
+}
+
+function isShipSunk(playerIdx, shipId) {
+  const pd = state.playerData[playerIdx];
+  const ship = pd.ships.find(s => s.id === shipId);
+  if (!ship) return false;
+  return ship.cells.every(([ci, ri]) =>
+    pd.attacks.some(a => a.coord[0] === ci && a.coord[1] === ri)
+  );
+}
+
+function doIntercept() {
+  const def = 1 - state.currentPlayer;
+  const defPd = state.playerData[def];
+  defPd.attacksLeft = Math.max(0, defPd.attacksLeft - 10);
+  defPd.interceptUsed = true;
+
+  const coord = `${COLS[state.pendingCoord[0]]}${ROWS[state.pendingCoord[1]]}`;
+  addLog(`⚡ ${state.players[def]}が迎撃！${coord}の攻撃を無効化（-10回）`);
+
+  // 攻撃側に miss として記録
+  state.playerData[state.currentPlayer].myAttacks.push({ coord: state.pendingCoord, result: 'miss' });
+
+  // 自陣に記録（守備側）
+  defPd.attacks.push({ coord: state.pendingCoord, result: 'miss' });
+
+  // 返答フェーズへ（×として）
+  finishTurn('miss', true);
+}
+
+function submitResponse(result) {
+  const def = 1 - state.currentPlayer;
+  const defPd = state.playerData[def];
+  const atkPd = state.playerData[state.currentPlayer];
+  const [ci, ri] = state.pendingCoord;
+  const coord = `${COLS[ci]}${ROWS[ri]}`;
+
+  // 攻撃側の記録
+  atkPd.myAttacks.push({ coord: state.pendingCoord, result });
+  atkPd.attacksUsed++;
+  atkPd.attacksLeft = Math.max(0, atkPd.attacksLeft - 1);
+
+  // 守備側の記録（被攻撃）
+  defPd.attacks.push({ coord: state.pendingCoord, result });
+
+  const resultText = result === 'hit' ? '○命中' : result === 'near' ? '△波高し' : '×はずれ';
+  addLog(`${state.players[state.currentPlayer]}→${coord}：${resultText}`);
+
+  // 命中の場合、撃沈チェック
+  if (result === 'hit') {
+    checkSunk(def, ci, ri);
+  }
+
+  finishTurn(result, false);
+}
+
+function checkSunk(defIdx, ci, ri) {
+  const defPd = state.playerData[defIdx];
+  const ship = defPd.ships.find(s => s.cells.some(([sc, sr]) => sc === ci && sr === ri));
+  if (!ship) return;
+  const allHit = ship.cells.every(([sc, sr]) =>
+    defPd.attacks.some(a => a.coord[0] === sc && a.coord[1] === sr && a.result === 'hit')
+  );
+  if (allHit && !ship.sunk) {
+    ship.sunk = true;
+    // 撃沈された側（守備側）の残り攻撃回数を減らす
+    defPd.attacksLeft = Math.max(0, defPd.attacksLeft - ship.penalty);
+    addLog(`🔥 ${ship.name}を撃沈！${state.players[defIdx]}の残り攻撃-${ship.penalty}回 → 残り${defPd.attacksLeft}回`);
+  }
+}
+
+function finishTurn(result, wasIntercept) {
+  const atk = state.currentPlayer;
+  const def = 1 - atk;
+
+  const winner = checkWin(atk, def);
+  if (winner !== null) {
+    endGame(winner);
+    return;
+  }
+
+  if (state.mode === 'vs-cpu') {
+    // 敵対戦：次は敵のターン（少し待ってから実行）
+    state.currentPlayer = 1; // 敵
+    renderBattle();
+    setBattleMsg('敵が攻撃中...', 'warn');
+    setTimeout(() => cpuAttack(), 1000);
+  } else {
+    // 2人対戦：パス画面で交代
+    state.currentPlayer = def;
+    showPassScreen(
+      `${state.players[def]}へ交代`,
+      `${state.players[atk]}の攻撃結果：${wasIntercept ? '⚡迎撃（×）' : result === 'hit' ? '○命中' : result === 'near' ? '△波高し' : '×はずれ'}。\n${state.players[def]}（次の攻撃側）に端末を渡してください。`,
+      () => { renderBattle(); showPage('page-battle'); }
+    );
+  }
+}
+
+function checkWin(atk, def) {
+  const defPd = state.playerData[def];
+  const atkPd = state.playerData[atk];
+
+  // A: 空母と護衛艦の全マスに命中
+  const carrierSunk = isShipSunk(def, 'carrier');
+  const escortSunk  = isShipSunk(def, 'escort');
+  if (carrierSunk && escortSunk) return { winner: atk, condition: 'A', desc: '空母と護衛艦を全て撃沈！' };
+
+  // B: 潜水艦2隻に命中
+  const sub1Sunk = isShipSunk(def, 'sub1');
+  const sub2Sunk = isShipSunk(def, 'sub2');
+  if (sub1Sunk && sub2Sunk) return { winner: atk, condition: 'B', desc: '潜水艦2隻を全て撃沈！' };
+
+  // C: 相手の攻撃回数が0以下
+  if (defPd.attacksLeft <= 0) return { winner: atk, condition: 'C', desc: '相手の攻撃回数を0にした！' };
+
+  // 自分の攻撃回数が0
+  if (atkPd.attacksLeft <= 0) return { winner: def, condition: 'C', desc: '攻撃回数が尽きた！' };
+
+  return null;
+}
+
+
+// ==============================
+// 敵 ロジック
+// ==============================
+
+// 敵の艦隊をランダム配置
+function cpuPlaceShips() {
+  const pd = state.playerData[1];
+  pd.ships.forEach(ship => { ship.cells = []; });
+
+  const tryPlace = (ship) => {
+    for (let attempt = 0; attempt < 500; attempt++) {
+      const ci = Math.floor(Math.random() * 10);
+      const ri = Math.floor(Math.random() * 10);
+      let cells;
+      if (ship.id === 'carrier') {
+        const rot = Math.floor(Math.random() * 4);
+        cells = getCarrierCells(ci, ri, rot);
+      } else if (ship.size === 1) {
+        cells = [[ci, ri]];
+      } else {
+        const dir = Math.random() < 0.5 ? 'h' : 'v';
+        cells = [];
+        for (let i = 0; i < ship.size; i++) {
+          const nc = dir === 'h' ? ci + i : ci;
+          const nr = dir === 'v' ? ri + i : ri;
+          if (nc >= 10 || nr >= 10) { cells = null; break; }
+          cells.push([nc, nr]);
+        }
+      }
+      if (!cells) continue;
+      const occupied = pd.ships.flatMap(s => s.cells);
+      const conflict = cells.some(([nc, nr]) =>
+        occupied.some(([oc, or]) => oc === nc && or === nr)
+      );
+      if (!conflict && !hasAdjacency(cells, occupied)) { ship.cells = cells; return true; }
+    }
+    return false;
+  };
+
+  pd.ships.forEach(ship => tryPlace(ship));
+}
+
+// 攻撃結果を自動計算（defIdx側の海図をもとに）
+function calcAttackResult(defIdx, ci, ri) {
+  const defPd = state.playerData[defIdx];
+  // 本体に命中？
+  const directHit = defPd.ships.some(s =>
+    s.cells.some(([sc, sr]) => sc === ci && sr === ri)
+  );
+  if (directHit) return 'hit';
+  // 周囲（8方向）に本体がある？
+  const near = defPd.ships.some(s =>
+    s.cells.some(([sc, sr]) =>
+      Math.abs(sc - ci) <= 1 && Math.abs(sr - ri) <= 1
+    )
+  );
+  return near ? 'near' : 'miss';
+}
+
+// 人間の攻撃結果を即時処理（敵対戦専用）
+function humanAttackResult(ci, ri, result) {
+  const atkPd = state.playerData[0]; // 人間
+  const defPd = state.playerData[1]; // 敵
+
+  atkPd.myAttacks.push({ coord: [ci, ri], result });
+  atkPd.attacksUsed++;
+  atkPd.attacksLeft = Math.max(0, atkPd.attacksLeft - 1);
+  defPd.attacks.push({ coord: [ci, ri], result });
+
+  const coord = `${COLS[ci]}${ROWS[ri]}`;
+  const resultText = result === 'hit' ? '○命中' : result === 'near' ? '△波高し' : '×はずれ';
+  addLog(`あなた → ${coord}：${resultText}`);
+
+  if (result === 'hit') checkSunk(1, ci, ri);
+
+  // グリッド・UIを更新してから結果を表示
+  document.getElementById('sel-col').value = '';
+  document.getElementById('sel-row').value = '';
+  renderEnemyGrid();
+  renderAttackCounter();
+  renderLog();
+  document.getElementById('atk-remain').textContent = atkPd.attacksLeft;
+  const cpuRemainEl = document.getElementById('cpu-remain');
+  if (cpuRemainEl) cpuRemainEl.textContent = state.playerData[1].attacksLeft;
+
+  const winner = checkWin(0, 1);
+  if (winner !== null) { endGame(winner); return; }
+
+  const msgType = result === 'hit' ? 'danger' : result === 'near' ? 'warn' : '';
+  const msgIcon = result === 'hit' ? '💥' : result === 'near' ? '🌊' : '💨';
+  setBattleMsg(`${msgIcon} ${coord} → ${resultText}　敵の番になります`, msgType);
+
+  // しばらくして敵の攻撃
+  setTimeout(() => {
+    state.currentPlayer = 1;
+    renderBattle();
+    setBattleMsg('🤖 敵が攻撃を考えています...', 'warn');
+    setTimeout(() => cpuAttack(), 1400);
+  }, 1800);
+}
+
+// 敵がランダムに攻撃
+// ==============================
+// 敵 難易度ロジック
+// ==============================
+
+function setDifficulty(level) {
+  state.difficulty = level;
+  ['easy','normal','hard','expert'].forEach(l => {
+    document.getElementById('diff-' + l).classList.toggle('active', l === level);
+  });
+}
+
+// 未攻撃セルの一覧
+function getUnattacked() {
+  const cpuPd = state.playerData[1];
+  const list = [];
+  for (let ci = 0; ci < 10; ci++)
+    for (let ri = 0; ri < 10; ri++)
+      if (!cpuPd.myAttacks.some(a => a.coord[0] === ci && a.coord[1] === ri))
+        list.push([ci, ri]);
+  return list;
+}
+
+// Easy: 完全ランダム
+function cpuChooseEasy() {
+  const list = getUnattacked();
+  return list[Math.floor(Math.random() * list.length)];
+}
+
+// Normal: 命中後は周囲4方向を優先、連続命中なら延長方向を優先
+function cpuChooseNormal() {
+  const cpuPd = state.playerData[1];
+  const hits = cpuPd.myAttacks.filter(a => a.result === 'hit').map(a => a.coord);
+  const unattacked = getUnattacked();
+  const unset = new Set(unattacked.map(([c,r]) => `${c},${r}`));
+
+  if (hits.length > 0) {
+    // 連続命中（直線上）があれば延長方向を最優先
+    const lineTargets = getLineExtensions(hits, unset);
+    if (lineTargets.length > 0)
+      return lineTargets[Math.floor(Math.random() * lineTargets.length)];
+
+    // 命中セルの周囲4方向
+    const around = getAroundHits(hits, unset);
+    if (around.length > 0)
+      return around[Math.floor(Math.random() * around.length)];
+  }
+
+  // 命中なし：ランダム
+  return unattacked[Math.floor(Math.random() * unattacked.length)];
+}
+
+// Hard: 命中後の推論 + △波高しも活用 + 市松模様パターンで効率探索
+
+// ==============================
+// Expert AI: 確率マップ
+// ==============================
+
+// 人間側の攻撃履歴から「情報マップ」を構築
+function buildInfoMap() {
+  const humanPd = state.playerData[0]; // 人間の海図（敵が攻撃した結果）
+  const cpuPd   = state.playerData[1];
+
+  // 敵の攻撃履歴から各マスの状態を取得
+  const hit  = new Set(); // ○命中
+  const near = new Set(); // △波高し
+  const miss = new Set(); // ×はずれ
+
+  cpuPd.myAttacks.forEach(a => {
+    const key = `${a.coord[0]},${a.coord[1]}`;
+    if (a.result === 'hit')  hit.add(key);
+    if (a.result === 'near') near.add(key);
+    if (a.result === 'miss') miss.add(key);
+  });
+
+  return { hit, near, miss };
+}
+
+// 隣接不可ルールを考慮した「置けないマス」セット
+function buildForbiddenSet(info, excludeZone) {
+  const forbidden = new Set(excludeZone);
+  // はずれマスとその周囲8マスは置けない
+  info.miss.forEach(key => {
+    const [c, r] = key.split(',').map(Number);
+    for (let dc = -1; dc <= 1; dc++)
+      for (let dr = -1; dr <= 1; dr++) {
+        const nc = c + dc, nr = r + dr;
+        if (nc >= 0 && nc < 10 && nr >= 0 && nr < 10)
+          forbidden.add(`${nc},${nr}`);
+      }
+  });
+  return forbidden;
+}
+
+// あるパターン（セルリスト）が現在の情報と矛盾しないか検証
+function isPatternValid(cells, info, forbidden) {
+  const cellKeys = cells.map(([c,r]) => `${c},${r}`);
+
+  // 禁止マスに重なるパターンは無効
+  if (cellKeys.some(k => forbidden.has(k))) return false;
+
+  // ○命中マスがある場合：そのマスを含むパターンを優先
+  // （命中マスを1つでも含まないパターンは低優先だが除外はしない）
+  // ただしすでに命中済みのマスに重なる場合、そのマスはhitでないと矛盾
+  for (const k of cellKeys) {
+    // 命中済みでも波高しでもない攻撃済みマス → はずれ → forbidden で除外済み
+  }
+
+  // 波高しマスの検証:
+  // 波高し△は「周囲8マスのどこかに船がいる」ことを意味する
+  // このパターンが波高しマスの周囲に存在するかチェック（スコア加算用、除外はしない）
+
+  return true;
+}
+
+// 確率マップを構築してスコア最大のマスを返す
+function cpuChooseExpert() {
+  const cpuPd  = state.playerData[1];
+  const info   = buildInfoMap();
+  const excludeZone = getSunkExcludeZone();
+  const forbidden   = buildForbiddenSet(info, excludeZone);
+
+  // スコアマップ（100マス）
+  const scoreMap = Array(10).fill(null).map(() => Array(10).fill(0));
+
+  // 未撃沈の船ごとに全配置パターンを列挙
+  const humanPd = state.playerData[0];
+  const aliveShips = humanPd.ships.filter(s => !s.sunk);
+
+  aliveShips.forEach(ship => {
+    const patterns = getAllShipPatterns(ship);
+
+    patterns.forEach(cells => {
+      if (!isPatternValid(cells, info, forbidden)) return;
+
+      // 命中済みマスを含むパターンにボーナス
+      const hitBonus = cells.some(([c,r]) => info.hit.has(`${c},${r}`)) ? 3 : 1;
+
+      // 波高しマスの周囲にあるパターンにボーナス
+      let nearBonus = 0;
+      info.near.forEach(nk => {
+        const [nc, nr] = nk.split(',').map(Number);
+        if (cells.some(([c,r]) => Math.abs(c-nc) <= 1 && Math.abs(r-nr) <= 1))
+          nearBonus += 1;
+      });
+
+      const bonus = hitBonus + nearBonus;
+      cells.forEach(([c,r]) => {
+        scoreMap[r][c] += bonus;
+      });
+    });
+  });
+
+  // 未攻撃マスの中でスコア最大を選ぶ
+  let bestScore = -1;
+  let bestCells = [];
+
+  for (let r = 0; r < 10; r++) {
+    for (let c = 0; c < 10; c++) {
+      // 攻撃済みはスキップ
+      if (cpuPd.myAttacks.some(a => a.coord[0] === c && a.coord[1] === r)) continue;
+      if (scoreMap[r][c] > bestScore) {
+        bestScore = scoreMap[r][c];
+        bestCells = [[c, r]];
+      } else if (scoreMap[r][c] === bestScore) {
+        bestCells.push([c, r]);
+      }
+    }
+  }
+
+  if (bestCells.length === 0) return cpuChooseEasy();
+  return bestCells[Math.floor(Math.random() * bestCells.length)];
+}
+
+// 船の全配置パターンを返す（セルリストの配列）
+function getAllShipPatterns(ship) {
+  const patterns = [];
+
+  if (ship.id === 'carrier') {
+    // 空母：L字×4回転
+    for (let rot = 0; rot < 4; rot++) {
+      const offsets = getCarrierShape(rot);
+      const maxDX = Math.max(...offsets.map(([x]) => x));
+      const maxDY = Math.max(...offsets.map(([,y]) => y));
+      for (let ci = 0; ci + maxDX < 10; ci++) {
+        for (let ri = 0; ri + maxDY < 10; ri++) {
+          const cells = offsets.map(([dx,dy]) => [ci+dx, ri+dy]);
+          if (cells.every(([c,r]) => c >= 0 && c < 10 && r >= 0 && r < 10))
+            patterns.push(cells);
+        }
+      }
+    }
+  } else if (ship.size === 1) {
+    // 潜水艦：1マス
+    for (let c = 0; c < 10; c++)
+      for (let r = 0; r < 10; r++)
+        patterns.push([[c, r]]);
+  } else {
+    // 直線船：横・縦
+    for (let c = 0; c <= 10 - ship.size; c++)
+      for (let r = 0; r < 10; r++)
+        patterns.push(Array.from({length: ship.size}, (_, i) => [c+i, r]));
+    for (let c = 0; c < 10; c++)
+      for (let r = 0; r <= 10 - ship.size; r++)
+        patterns.push(Array.from({length: ship.size}, (_, i) => [c, r+i]));
+  }
+
+  return patterns;
+}
+
+// 撃沈済み船のセル＋周囲8マスを除外ゾーンとして返す
+function getSunkExcludeZone() {
+  const humanPd = state.playerData[0];
+  const excludeSet = new Set();
+  humanPd.ships.forEach(ship => {
+    if (!ship.sunk) return;
+    ship.cells.forEach(([sc, sr]) => {
+      for (let dc = -1; dc <= 1; dc++)
+        for (let dr = -1; dr <= 1; dr++) {
+          const nc = sc + dc, nr = sr + dr;
+          if (nc >= 0 && nc < 10 && nr >= 0 && nr < 10)
+            excludeSet.add(`${nc},${nr}`);
+        }
+    });
+  });
+  return excludeSet;
+}
+
+function cpuChooseHard() {
+  const cpuPd = state.playerData[1];
+  const excludeZone = getSunkExcludeZone();
+
+  // 撃沈済み船に関係するhits/nearsを除外してアクティブなものだけ残す
+  const activeHits = cpuPd.myAttacks
+    .filter(a => a.result === 'hit' && !excludeZone.has(`${a.coord[0]},${a.coord[1]}`))
+    .map(a => a.coord);
+  const activeNears = cpuPd.myAttacks
+    .filter(a => a.result === 'near' && !excludeZone.has(`${a.coord[0]},${a.coord[1]}`))
+    .map(a => a.coord);
+
+  // 未攻撃かつ除外ゾーン外のセル
+  const allUnattacked = getUnattacked();
+  const unattacked = allUnattacked.filter(([c,r]) => !excludeZone.has(`${c},${r}`));
+  const unset = new Set(unattacked.map(([c,r]) => `${c},${r}`));
+
+  if (activeHits.length > 0) {
+    // 連続命中の延長を最優先
+    const lineTargets = getLineExtensions(activeHits, unset);
+    if (lineTargets.length > 0)
+      return lineTargets[Math.floor(Math.random() * lineTargets.length)];
+
+    // 命中周囲4方向
+    const around = getAroundHits(activeHits, unset);
+    if (around.length > 0)
+      return around[Math.floor(Math.random() * around.length)];
+  }
+
+  // アクティブな波高しがあればスコアリング
+  if (activeNears.length > 0) {
+    const scored = scoreByNear(activeNears, unset, unattacked);
+    if (scored.length > 0) return scored[0];
+  }
+
+  // 市松模様（偶数マスのみ）で効率探索（除外ゾーン外）
+  const checkerboard = unattacked.filter(([c,r]) => (c + r) % 2 === 0);
+  if (checkerboard.length > 0)
+    return checkerboard[Math.floor(Math.random() * checkerboard.length)];
+
+  return unattacked[Math.floor(Math.random() * unattacked.length)]
+      || allUnattacked[Math.floor(Math.random() * allUnattacked.length)];
+}
+
+// 連続命中セルから直線延長候補を返す
+function getLineExtensions(hits, unset) {
+  const candidates = [];
+  // 水平方向の連続を探す
+  const hitSet = new Set(hits.map(([c,r]) => `${c},${r}`));
+  hits.forEach(([hc, hr]) => {
+    // 右に延長できる？
+    let c = hc + 1;
+    while (hitSet.has(`${c},${hr}`)) c++;
+    if (unset.has(`${c},${hr}`)) candidates.push([c, hr]);
+    // 左に延長
+    c = hc - 1;
+    while (hitSet.has(`${c},${hr}`)) c--;
+    if (unset.has(`${c},${hr}`)) candidates.push([c, hr]);
+    // 下に延長
+    let r = hr + 1;
+    while (hitSet.has(`${hc},${r}`)) r++;
+    if (unset.has(`${hc},${r}`)) candidates.push([hc, r]);
+    // 上に延長
+    r = hr - 1;
+    while (hitSet.has(`${hc},${r}`)) r--;
+    if (unset.has(`${hc},${r}`)) candidates.push([hc, r]);
+  });
+  // 重複排除
+  return [...new Map(candidates.map(c => [`${c[0]},${c[1]}`, c])).values()];
+}
+
+// 命中セル周囲4方向の未攻撃セル
+function getAroundHits(hits, unset) {
+  const dirs = [[1,0],[-1,0],[0,1],[0,-1]];
+  const candidates = [];
+  hits.forEach(([hc, hr]) => {
+    dirs.forEach(([dc, dr]) => {
+      const nc = hc + dc, nr = hr + dr;
+      if (nc >= 0 && nc < 10 && nr >= 0 && nr < 10 && unset.has(`${nc},${nr}`))
+        candidates.push([nc, nr]);
+    });
+  });
+  return [...new Map(candidates.map(c => [`${c[0]},${c[1]}`, c])).values()];
+}
+
+// △波高しセルのスコアリング（周囲に△が多いほど高スコア）
+function scoreByNear(nears, unset, unattacked) {
+  const nearSet = new Set(nears.map(([c,r]) => `${c},${r}`));  // nears はすでに座標配列
+  const scored = unattacked.map(([ci, ri]) => {
+    let score = 0;
+    // 8方向の波高しセル数をカウント
+    for (let dc = -1; dc <= 1; dc++)
+      for (let dr = -1; dr <= 1; dr++)
+        if (dc !== 0 || dr !== 0)
+          if (nearSet.has(`${ci+dc},${ri+dr}`)) score++;
+    return { coord: [ci, ri], score };
+  });
+  scored.sort((a, b) => b.score - a.score);
+  const best = scored.filter(s => s.score === scored[0].score);
+  return best.map(s => s.coord);
+}
+
+function cpuAttack() {
+  const cpuPd = state.playerData[1];
+
+  // 難易度に応じて座標を選択
+  let chosen;
+  if (state.difficulty === 'easy')        chosen = cpuChooseEasy();
+  else if (state.difficulty === 'hard')   chosen = cpuChooseHard();
+  else if (state.difficulty === 'expert') chosen = cpuChooseExpert();
+  else                                    chosen = cpuChooseNormal();
+
+  if (!chosen) return;
+  const [ci, ri] = chosen;
+  const coord = `${COLS[ci]}${ROWS[ri]}`;
+
+  // 人間側の海図に対して結果を計算
+  const result = calcAttackResult(0, ci, ri);
+
+  // 記録（敵が攻撃）
+  cpuPd.myAttacks.push({ coord: [ci, ri], result });
+  cpuPd.attacksUsed++;
+  cpuPd.attacksLeft = Math.max(0, cpuPd.attacksLeft - 1);
+  state.playerData[0].attacks.push({ coord: [ci, ri], result });
+
+  const resultText = result === 'hit' ? '○命中' : result === 'near' ? '△波高し' : '×はずれ';
+  addLog(`敵 → ${coord}：${resultText}`);
+
+  if (result === 'hit') checkSunk(0, ci, ri);
+
+  // 自陣グリッドをリアルタイム更新（攻撃されたマスを即座に表示）
+  switchTab('own');
+  renderOwnGrid();
+  renderShipStatus();
+  renderLog();
+
+  // 攻撃されたセルをフラッシュ演出
+  flashOwnCell(ci, ri, result);
+
+  const msgIcon = result === 'hit' ? '💥' : result === 'near' ? '🌊' : '💨';
+  const msgType = result === 'hit' ? 'danger' : result === 'near' ? 'warn' : '';
+  setBattleMsg(`🤖 敵 が ${coord} を攻撃：${resultText}`, msgType);
+
+  // 勝利チェック
+  const winner = checkWin(1, 0);
+  if (winner !== null) {
+    setTimeout(() => endGame(winner), 1600);
+    return;
+  }
+
+  // 少し待ってから人間のターンへ
+  setTimeout(() => {
+    state.currentPlayer = 0;
+    renderBattle();
+    switchTab('attack');
+    setBattleMsg(`🤖 敵 が ${coord} を攻撃：${resultText}　あなたの番です`, msgType);
+  }, 2400);
+}
+
+// 自陣の攻撃されたセルをフラッシュ
+function flashOwnCell(ci, ri, result) {
+  const grid = document.getElementById('own-grid');
+  if (!grid) return;
+  const cell = grid.querySelector(`[data-ci="${ci}"][data-ri="${ri}"]`);
+  if (!cell) return;
+  const color = result === 'hit' ? 'rgba(255,59,48,0.6)' : result === 'near' ? 'rgba(255,149,0,0.5)' : 'rgba(100,100,100,0.2)';
+  // 2回フラッシュ
+  const flash = (times) => {
+    if (times <= 0) {
+      cell.style.transition = 'background 0.5s';
+      cell.style.background = '';
+      return;
+    }
+    cell.style.transition = 'none';
+    cell.style.background = color;
+    setTimeout(() => {
+      cell.style.transition = 'background 0.3s';
+      cell.style.background = '';
+      setTimeout(() => flash(times - 1), 400);
+    }, 280);
+  };
+  flash(2);
+}
+
+function onSelectChange() {
+  const col = document.getElementById('sel-col').value;
+  const row = document.getElementById('sel-row').value;
+  if (col && row) {
+    const ci = COLS.indexOf(col);
+    const ri = ROWS.indexOf(row);
+    highlightTargetCell(ci, ri);
+  }
+}
+
+function addLog(text) {
+  state.battleLog.push(text);
+}
+
+// ==============================
+// ゲーム終了
+// ==============================
+function endGame(result) {
+  const winPlayer = state.players[result.winner];
+  const losePlayer = state.players[1 - result.winner];
+  
+  document.getElementById('result-title').textContent = `${winPlayer} の勝利！`;
+  document.getElementById('result-desc').textContent =
+    `勝利条件${result.condition}達成：${result.desc}`;
+
+  const atkPd = state.playerData[result.winner];
+  const defPd = state.playerData[1 - result.winner];
+  document.getElementById('result-stats').innerHTML = `
+    <div class="card-title">対戦結果</div>
+    <div class="ship-status-row"><span>${winPlayer} 攻撃回数使用</span><span style="font-family:'Share Tech Mono',monospace;color:var(--accent)">${atkPd.attacksUsed}回</span></div>
+    <div class="ship-status-row"><span>${losePlayer} 残り攻撃回数</span><span style="font-family:'Share Tech Mono',monospace;color:var(--hit)">${defPd.attacksLeft}回</span></div>
+  `;
+  showPage('page-result');
+}
+
+// ==============================
+// モーダル
+// ==============================
+let modalCallback = null;
+function showModal(title, body, cb) {
+  document.getElementById('modal-title').textContent = title;
+  document.getElementById('modal-body').textContent = body;
+  modalCallback = cb;
+  document.getElementById('modal-overlay').classList.add('open');
+}
+function closeModal() { document.getElementById('modal-overlay').classList.remove('open'); }
+function modalOk() { closeModal(); if (modalCallback) modalCallback(); }
+
+// 起動時テーマ適用
+document.addEventListener('DOMContentLoaded', () => setTheme('blue'));
+
+function updatePhaseLabel(text) {
+  document.getElementById('phase-label').textContent = text;
+}
+</script>
+</body>
+</html>

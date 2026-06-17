@@ -381,6 +381,8 @@ nav {
   padding: 10px 14px;
   display: flex;
   flex-direction: column;
+  align-items: center;
+  text-align: center;
   gap: 2px;
 }
 .pill-label { font-size: 11px; font-weight: 500; color: var(--label3); }
@@ -790,6 +792,7 @@ nav {
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
         <div class="card-title" style="margin-bottom:0">海図</div>
         <div style="display:flex;gap:8px">
+          <button class="btn btn-secondary btn-sm" onclick="goHome()" style="margin-bottom:0;padding:6px 12px;font-size:13px;width:auto">ホームに戻る</button>
           <button class="btn btn-secondary btn-sm" onclick="resetPlacement()" style="margin-bottom:0;padding:6px 12px;font-size:13px;width:auto">↺ リセット</button>
           <button class="btn btn-primary btn-sm" id="place-confirm" onclick="confirmPlacement()" disabled style="opacity:0.4;margin-bottom:0;padding:6px 12px;font-size:13px;width:auto">決定 ✓</button>
         </div>
@@ -824,11 +827,11 @@ nav {
         <span class="pill-label">自分の残り攻撃</span>
         <span class="pill-val" id="atk-remain">100</span>
       </div>
-      <div class="status-pill" id="cpu-remain-pill" style="flex:0.8">
+      <div class="status-pill" id="cpu-remain-pill" style="flex:0.8;display:none">
         <span class="pill-label">敵の残り攻撃</span>
         <span class="pill-val" id="cpu-remain" style="color:var(--red)">100</span>
       </div>
-      <div class="status-pill" id="diff-pill" style="flex:0.7">
+      <div class="status-pill" id="diff-pill">
         <span class="pill-label">難易度</span>
         <span class="pill-val" id="diff-display" style="font-size:14px;margin-top:2px">—</span>
       </div>
@@ -915,9 +918,13 @@ nav {
   <div class="screen">
     <div class="result-trophy">🏆</div>
     <div class="result-title" id="result-title"></div>
-    <div class="result-desc" id="result-desc"></div>
-    <div class="card" id="result-stats"></div>
-    <button class="btn btn-primary" onclick="location.reload()" style="margin-top:16px">もう一度プレイ</button>
+    <div class="card">
+      <div class="card-title">敵の海図（答え）</div>
+      <div class="grid-wrap">
+        <div class="grid-container" id="result-grid"></div>
+      </div>
+    </div>
+    <button class="btn btn-primary" onclick="location.reload()" style="margin-top:4px">もう一度プレイ</button>
   </div>
 </div>
 
@@ -1149,6 +1156,12 @@ function initPlayerData() {
 function showPage(id) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.getElementById(id).classList.add('active');
+}
+
+function goHome() {
+  if (confirm('ホームに戻りますか？現在の進行状況は失われます。')) {
+    location.reload();
+  }
 }
 
 function showRules() { showPage('page-rules'); }
@@ -1529,13 +1542,13 @@ function startBattle() {
   showPage('page-battle');
   updatePhaseLabel('対戦中');
   // 難易度表示
-  const labels = { easy:'Easy 🌱', normal:'Normal ⚔️', hard:'Hard 🔥', expert:'Expert 🤖' };
+  const labels = { easy:'Easy', normal:'Normal', hard:'Hard', expert:'Expert' };
   const el = document.getElementById('diff-display');
   if (el) el.textContent = labels[state.difficulty] || '';
   const pill = document.getElementById('diff-pill');
   if (pill) pill.style.display = state.mode === 'vs-cpu' ? '' : 'none';
   const cpuPill = document.getElementById('cpu-remain-pill');
-  if (cpuPill) cpuPill.style.display = state.mode === 'vs-cpu' ? '' : 'none';
+  if (cpuPill) cpuPill.style.display = 'none';
 }
 
 function renderBattle() {
@@ -1988,7 +2001,11 @@ function humanAttackResult(ci, ri, result) {
   if (cpuRemainEl) cpuRemainEl.textContent = state.playerData[1].attacksLeft;
 
   const winner = checkWin(0, 1);
-  if (winner !== null) { endGame(winner); return; }
+  if (winner !== null) {
+    renderEnemyGrid();
+    setTimeout(() => endGame(winner), 5000);
+    return;
+  }
 
   const msgType = result === 'hit' ? 'danger' : result === 'near' ? 'warn' : '';
   const msgIcon = result === 'hit' ? '💥' : result === 'near' ? '🌊' : '💨';
@@ -2423,7 +2440,7 @@ function cpuAttack() {
   // 勝利チェック
   const winner = checkWin(1, 0);
   if (winner !== null) {
-    setTimeout(() => endGame(winner), 1600);
+    setTimeout(() => endGame(winner), 5000);
     return;
   }
 
@@ -2479,21 +2496,51 @@ function addLog(text) {
 // ゲーム終了
 // ==============================
 function endGame(result) {
+  const isHumanWin = result.winner === 0;
   const winPlayer = state.players[result.winner];
-  const losePlayer = state.players[1 - result.winner];
-  
-  document.getElementById('result-title').textContent = `${winPlayer} の勝利！`;
-  document.getElementById('result-desc').textContent =
-    `勝利条件${result.condition}達成：${result.desc}`;
 
-  const atkPd = state.playerData[result.winner];
-  const defPd = state.playerData[1 - result.winner];
-  document.getElementById('result-stats').innerHTML = `
-    <div class="card-title">対戦結果</div>
-    <div class="ship-status-row"><span>${winPlayer} 攻撃回数使用</span><span style="font-family:'Share Tech Mono',monospace;color:var(--accent)">${atkPd.attacksUsed}回</span></div>
-    <div class="ship-status-row"><span>${losePlayer} 残り攻撃回数</span><span style="font-family:'Share Tech Mono',monospace;color:var(--hit)">${defPd.attacksLeft}回</span></div>
-  `;
+  document.getElementById('result-title').textContent =
+    isHumanWin ? 'あなたの勝利' : '敵の勝利';
+  document.querySelector('.result-trophy').style.display = 'none';
+
+  // 敵（CPU）の海図をすべて公開して表示
+  renderResultGrid();
+
   showPage('page-result');
+}
+
+// 敵の艦隊配置を全て公開して表示するグリッド
+function renderResultGrid() {
+  const enemyPd = state.playerData[1]; // 敵（CPU）の海図
+  const myAttacksOnEnemy = enemyPd.attacks; // 自分が敵を攻撃した履歴
+
+  const grid = document.getElementById('result-grid');
+  grid.innerHTML = '';
+  grid.appendChild(makeHeader(''));
+  COLS.forEach(c => grid.appendChild(makeHeader(c)));
+
+  ROWS.forEach((r, ri) => {
+    grid.appendChild(makeHeader(r));
+    COLS.forEach((c, ci) => {
+      const cell = document.createElement('div');
+      cell.className = 'cell';
+
+      const shipHere = enemyPd.ships.find(s => s.cells.some(cl => cl[0] === ci && cl[1] === ri));
+      if (shipHere) {
+        cell.classList.add('ship');
+        cell.textContent = SHIP_LABELS[shipHere.id] || '艦';
+        cell.style.fontWeight = '700';
+        cell.style.fontSize = '10px';
+        // 命中していたら色を変える
+        const wasHit = myAttacksOnEnemy.some(a => a.coord[0] === ci && a.coord[1] === ri && a.result === 'hit');
+        if (wasHit) {
+          cell.style.background = 'var(--hit-bg)';
+          cell.style.color = 'var(--red)';
+        }
+      }
+      grid.appendChild(cell);
+    });
+  });
 }
 
 // ==============================

@@ -2683,7 +2683,7 @@ function renderResultGrid() {
   COLS.forEach(c => grid.appendChild(makeHeader(c)));
 
   if (resultTab === 'enemy') {
-    // 敵（CPU）の海図を全公開
+    // 敵（CPU）の海図を全公開＋自分の攻撃履歴も表示
     const enemyPd = state.playerData[1];
     const myAttacksOnEnemy = enemyPd.attacks;
 
@@ -2694,15 +2694,25 @@ function renderResultGrid() {
         cell.className = 'cell';
 
         const shipHere = enemyPd.ships.find(s => s.cells.some(cl => cl[0] === ci && cl[1] === ri));
+        const myAttack = myAttacksOnEnemy.find(a => a.coord[0] === ci && a.coord[1] === ri);
+
         if (shipHere) {
           cell.classList.add('ship');
           cell.textContent = SHIP_LABELS[shipHere.id] || '艦';
           cell.style.fontWeight = '700';
           cell.style.fontSize = '10px';
-          const wasHit = myAttacksOnEnemy.some(a => a.coord[0] === ci && a.coord[1] === ri && a.result === 'hit');
-          if (wasHit) {
+          if (myAttack && myAttack.result === 'hit') {
             cell.style.background = 'var(--hit-bg)';
             cell.style.color = 'var(--red)';
+          }
+        } else if (myAttack) {
+          // 船がない場所への攻撃結果（波高し／はずれ）も表示
+          if (myAttack.result === 'near') {
+            cell.classList.add('near');
+            cell.textContent = '△';
+          } else if (myAttack.result === 'miss') {
+            cell.classList.add('miss');
+            cell.textContent = '×';
           }
         }
         grid.appendChild(cell);

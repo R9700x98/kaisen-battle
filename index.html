@@ -918,8 +918,12 @@ nav {
   <div class="screen">
     <div class="result-trophy">🏆</div>
     <div class="result-title" id="result-title"></div>
+    <div class="tab-bar">
+      <button class="tab active" id="result-tab-enemy" onclick="switchResultTab('enemy')">敵の海図</button>
+      <button class="tab" id="result-tab-own" onclick="switchResultTab('own')">自分の海図</button>
+    </div>
     <div class="card">
-      <div class="card-title">敵の海図（答え）</div>
+      <div class="card-title" id="result-grid-title">敵の海図（答え）</div>
       <div class="grid-wrap">
         <div class="grid-container" id="result-grid"></div>
       </div>
@@ -2127,100 +2131,158 @@ function buildForbiddenSet(info, excludeZone) {
 }
 
 // あるパターン（セルリスト）が現在の情報と矛盾しないか検証
-function isPatternValid(cells, info, forbidden) {
+function isPatternValid(cells, info, forbidden, requiredLine, isShaped) {
   const cellKeys = cells.map(([c,r]) => `${c},${r}`);
 
-  // 1. 禁止マスに重なるパターンは無効（×はずれ＋周囲8マス＋撃沈除外ゾーン）
+  // 1. 禁止マスに重なるパターンは無効（×はずれ＋周囲8マス＋撃沈除外ゾーン＋隣接禁止ゾーン）
   if (cellKeys.some(k => forbidden.has(k))) return false;
 
-  // 2. このパターンが「説明できない命中マス」を作らないか確認
-  //    命中マスがパターン外にある場合、そのマスは別の船のはず → このパターンは有効
-  //    ただし、命中マスがパターン内にある場合、そのマスが本当に命中か確認（矛盾チェック）
-  //    → 命中マスにパターンが重なっているのはOK
-
-  // 3. パターンが「はずれマス」を含んでいないか（forbiddenで除外済みだが念のため）
+  // 2. はずれマスを含むパターンは無効
   for (const k of cellKeys) {
     if (info.miss.has(k)) return false;
   }
 
-  // 4. 波高しの整合性チェック
-  //    波高しマスの「周囲8マスのどこかにこのパターンが掛かる」なら整合性あり
-  //    ただし「波高しマスの周囲にパターンが全く掛からないのに波高しが出た」は矛盾
-  //    → 波高しが存在する場合、そのうち少なくとも1つをこのパターンが説明できなくても
-  //       別の船が説明できる可能性があるため除外しない（スコアリングで対応）
+  // 3. 【改善①】直線が確定している場合、その直線上にないパターンは完全除外
+  //    ただしL字形（空母など shaped:true）の船には直線制約を適用しない。
+  //    L字は一部が直線状に並んでいても、途中で折れ曲がる可能性があるため。
+  if (requiredLine && !isShaped) {
+    const onLine = cells.every(([c, r]) =>
+      requiredLine.axis === 'h' ? r === requiredLine.fixed : c === requiredLine.fixed
+    );
+    if (!onLine) return false;
+  }
 
   return true;
 }
 
+// 【改善④】このパターンが波高しマスを説明できるかチェック（除外条件として使用）
+function patternExplainsNears(cells, nearKeys) {
+  // nearKeysが空なら制約なし→true
+  if (nearKeys.length === 0) return true;
+  // 少なくとも1つの波高しマスの周囲8マスに、このパターンのいずれかのセルが含まれるか
+  return nearKeys.some(nk => {
+    const [nc, nr] = nk.split(',').map(Number);
+    return cells.some(([c, r]) => Math.abs(c - nc) <= 1 && Math.abs(r - nr) <= 1);
+  });
+}
+
 // 確率マップを構築してスコア最大のマスを返す
+// 【改善①】命中マス群から直線（軸＋固定座標）を検出する
+function detectRequiredLine(activeHitsArr) {
+  if (activeHitsArr.length < 2) return null;
+  // 全て同じ行なら水平、全て同じ列なら垂直
+  const allSameRow = activeHitsArr.every(([,r]) => r === activeHitsArr[0][1]);
+  const allSameCol = activeHitsArr.every(([c]) => c === activeHitsArr[0][0]);
+  if (allSameRow) return { axis: 'h', fixed: activeHitsArr[0][1] };
+  if (allSameCol) return { axis: 'v', fixed: activeHitsArr[0][0] };
+  return null; // L字（空母）など直線にならない場合は制約なし
+}
+
 function cpuChooseExpert() {
   const cpuPd   = state.playerData[1];
   const humanPd = state.playerData[0];
-  const info        = buildInfoMap();
-  const excludeZone = getSunkExcludeZone();
-  const forbidden   = buildForbiddenSet(info, excludeZone);
+  const info = buildInfoMap();
+
+  const baseExcludeZone = getSunkExcludeZone();
+
+  // アクティブな命中マス（撃沈除外ゾーン外）
+  const activeHitsArr = cpuPd.myAttacks
+    .filter(a => a.result === 'hit' && !baseExcludeZone.has(`${a.coord[0]},${a.coord[1]}`))
+    .map(a => a.coord);
+  const activeHits = new Set(activeHitsArr.map(([c,r]) => `${c},${r}`));
+
+  // 【改善⑤】輪郭確定済みの未撃沈船も除外ゾーンに追加
+  const hullExcludeZone = getConfirmedHullExcludeZone(activeHitsArr, info);
+  const excludeZone = new Set([...baseExcludeZone, ...hullExcludeZone]);
+  const forbidden = buildForbiddenSet(info, excludeZone);
 
   // 未撃沈の船リスト
   const aliveShips = humanPd.ships.filter(s => !s.sunk);
 
-  // アクティブな命中マス（撃沈除外ゾーン外）
-  const activeHits = new Set(
-    cpuPd.myAttacks
-      .filter(a => a.result === 'hit' && !excludeZone.has(`${a.coord[0]},${a.coord[1]}`))
-      .map(a => `${a.coord[0]},${a.coord[1]}`)
-  );
+  // 【改善①】直線が確定しているか検出
+  const requiredLine = detectRequiredLine(activeHitsArr);
+
+  // アクティブな波高しマス
+  const activeNearKeys = [...info.near].filter(k => !excludeZone.has(k));
+
+  // 攻撃済みマス
+  const attacked = new Set(cpuPd.myAttacks.map(a => `${a.coord[0]},${a.coord[1]}`));
+
+  // 【改善④】終盤の詰めロジック：残り船が少ない場合、全パターンの積算で
+  // 「全てのパターンに共通して含まれるマス」があれば確実に当たる
+  if (aliveShips.length <= 2) {
+    const sureHit = findSureHitCell(aliveShips, info, forbidden, requiredLine, attacked);
+    if (sureHit) return sureHit;
+  }
 
   // スコアマップ
   const scoreMap = Array(10).fill(null).map(() => Array(10).fill(0));
+  let anyValidPattern = false;
 
   aliveShips.forEach(ship => {
     const patterns = getAllShipPatterns(ship);
 
     patterns.forEach(cells => {
-      if (!isPatternValid(cells, info, forbidden)) return;
+      if (!isPatternValid(cells, info, forbidden, requiredLine, ship.shaped)) return;
 
       const cellKeys = cells.map(([c,r]) => `${c},${r}`);
-
-      // ── スコア計算 ──
-
-      // A. 命中マスを含む数（多いほど高スコア）
       const hitCount = cellKeys.filter(k => activeHits.has(k)).length;
-
-      // B. 命中マスが存在するのにこのパターンが1つも含まない → 探索フェーズ用に低スコア
       const hasAnyHit = activeHits.size > 0;
+
+      // 命中追跡中、命中を含まないパターンはほぼ無視
       if (hasAnyHit && hitCount === 0) {
-        // 命中追跡中は、命中を含まないパターンの寄与を大幅に下げる
-        cells.forEach(([c,r]) => { scoreMap[r][c] += 0.1; });
         return;
       }
 
-      // C. 波高しマスの周囲をカバーするパターンにボーナス
+      // 【改善②】波高しの整合性：波高しが存在する場合、
+      // 説明できないパターンは除外（命中追跡中でなければ）
+      if (!hasAnyHit && activeNearKeys.length > 0) {
+        if (!patternExplainsNears(cells, activeNearKeys)) return;
+      }
+
+      anyValidPattern = true;
+
+      // 波高しの周囲をカバーするボーナス（複数の波高しを満たすほど高評価）
       let nearBonus = 0;
-      info.near.forEach(nk => {
+      let nearMatchCount = 0;
+      activeNearKeys.forEach(nk => {
         const [nc, nr] = nk.split(',').map(Number);
         if (cellKeys.some(k => {
           const [kc, kr] = k.split(',').map(Number);
           return Math.abs(kc - nc) <= 1 && Math.abs(kr - nr) <= 1;
-        })) nearBonus += 2;
+        })) { nearBonus += 2; nearMatchCount++; }
       });
+      // 【改善③】複数の波高しを同時に満たすパターンに指数的ボーナス
+      if (nearMatchCount >= 2) nearBonus += nearMatchCount * nearMatchCount * 3;
 
-      // D. 命中マスを全て連続して含むパターン（直線整合）にさらにボーナス
+      // 命中の直線整合ボーナス
       let lineBonus = 0;
       if (hitCount >= 2) {
-        // 全命中マスがこのパターン内に含まれているか
         const allHitsCovered = [...activeHits].every(k => cellKeys.includes(k));
-        if (allHitsCovered) lineBonus = hitCount * 3;
+        if (allHitsCovered) lineBonus = hitCount * 4;
       }
 
-      const score = (hitCount * 5) + nearBonus + lineBonus + 1;
+      const score = (hitCount * 6) + nearBonus + lineBonus + 1;
       cells.forEach(([c,r]) => {
         scoreMap[r][c] += score;
       });
     });
   });
 
-  // 攻撃済みマスを除外してスコア最大を選択
-  const attacked = new Set(cpuPd.myAttacks.map(a => `${a.coord[0]},${a.coord[1]}`));
+  // 【改善③】複数の波高しが直接交差するマスに直接ボーナス加算
+  // （波高し2つの周囲が重なる座標を特別に優先）
+  for (let r = 0; r < 10; r++) {
+    for (let c = 0; c < 10; c++) {
+      if (attacked.has(`${c},${r}`)) continue;
+      let crossCount = 0;
+      activeNearKeys.forEach(nk => {
+        const [nc, nr] = nk.split(',').map(Number);
+        if (Math.abs(c - nc) <= 1 && Math.abs(r - nr) <= 1) crossCount++;
+      });
+      if (crossCount >= 2) scoreMap[r][c] += crossCount * 8;
+    }
+  }
+
   let bestScore = -1;
   let bestCells = [];
 
@@ -2236,8 +2298,31 @@ function cpuChooseExpert() {
     }
   }
 
-  if (bestCells.length === 0) return cpuChooseEasy();
+  if (!anyValidPattern || bestCells.length === 0) return cpuChooseHard();
   return bestCells[Math.floor(Math.random() * bestCells.length)];
+}
+
+// 【改善④終盤詰め】全パターンに共通して含まれる「確実に当たる」マスを探す
+function findSureHitCell(aliveShips, info, forbidden, requiredLine, attacked) {
+  for (const ship of aliveShips) {
+    const patterns = getAllShipPatterns(ship)
+      .filter(cells => isPatternValid(cells, info, forbidden, requiredLine, ship.shaped));
+    if (patterns.length === 0 || patterns.length > 40) continue; // 多すぎる場合は通常ロジックへ
+
+    // 全パターンの積集合（全パターンに共通するセル）
+    let common = new Set(patterns[0].map(([c,r]) => `${c},${r}`));
+    for (let i = 1; i < patterns.length; i++) {
+      const setI = new Set(patterns[i].map(([c,r]) => `${c},${r}`));
+      common = new Set([...common].filter(k => setI.has(k)));
+      if (common.size === 0) break;
+    }
+    const candidates = [...common].filter(k => !attacked.has(k));
+    if (candidates.length > 0) {
+      const [c, r] = candidates[0].split(',').map(Number);
+      return [c, r];
+    }
+  }
+  return null;
 }
 
 // 船の全配置パターンを返す（セルリストの配列）
@@ -2291,6 +2376,76 @@ function getSunkExcludeZone() {
         }
     });
   });
+  return excludeSet;
+}
+
+// 【改善⑤】まだ撃沈していなくても、連続命中の直線が「両端封鎖」されたら
+// その船は輪郭が確定したとみなし、周囲8マスを隣接禁止ゾーンとして追加する
+function getConfirmedHullExcludeZone(activeHitsArr, info) {
+  const excludeSet = new Set();
+  if (activeHitsArr.length < 2) return excludeSet;
+
+  const hitSet = new Set(activeHitsArr.map(([c,r]) => `${c},${r}`));
+
+  // 水平方向の連続グループを検出
+  const checkLine = (getKey, getNext, getPrev, getCoordFromOffset) => {
+    // 簡易実装：各命中点から両方向に伸ばして両端の状態を見る
+  };
+
+  // 水平の連続ブロックを抽出
+  const visited = new Set();
+  activeHitsArr.forEach(([c, r]) => {
+    const key = `${c},${r}`;
+    if (visited.has(key)) return;
+    // 同じ行で連続しているセルを集める
+    let left = c, right = c;
+    while (hitSet.has(`${left-1},${r}`)) left--;
+    while (hitSet.has(`${right+1},${r}`)) right++;
+    if (right > left) {
+      // 連続2マス以上のライン発見
+      for (let x = left; x <= right; x++) visited.add(`${x},${r}`);
+      // 両端が封鎖されているか（×はずれ or グリッド外）
+      const leftBlocked  = left === 0  || info.miss.has(`${left-1},${r}`);
+      const rightBlocked = right === 9 || info.miss.has(`${right+1},${r}`);
+      if (leftBlocked && rightBlocked) {
+        // 輪郭確定 → 周囲8マスを除外ゾーンに
+        for (let x = left; x <= right; x++) {
+          for (let dc = -1; dc <= 1; dc++) {
+            for (let dr = -1; dr <= 1; dr++) {
+              const nc = x + dc, nr = r + dr;
+              if (nc >= 0 && nc < 10 && nr >= 0 && nr < 10) excludeSet.add(`${nc},${nr}`);
+            }
+          }
+        }
+      }
+    }
+  });
+
+  // 垂直の連続ブロックを抽出
+  const visitedV = new Set();
+  activeHitsArr.forEach(([c, r]) => {
+    const key = `${c},${r}`;
+    if (visitedV.has(key)) return;
+    let top = r, bottom = r;
+    while (hitSet.has(`${c},${top-1}`)) top--;
+    while (hitSet.has(`${c},${bottom+1}`)) bottom++;
+    if (bottom > top) {
+      for (let y = top; y <= bottom; y++) visitedV.add(`${c},${y}`);
+      const topBlocked    = top === 0    || info.miss.has(`${c},${top-1}`);
+      const bottomBlocked = bottom === 9 || info.miss.has(`${c},${bottom+1}`);
+      if (topBlocked && bottomBlocked) {
+        for (let y = top; y <= bottom; y++) {
+          for (let dc = -1; dc <= 1; dc++) {
+            for (let dr = -1; dr <= 1; dr++) {
+              const nc = c + dc, nr = y + dr;
+              if (nc >= 0 && nc < 10 && nr >= 0 && nr < 10) excludeSet.add(`${nc},${nr}`);
+            }
+          }
+        }
+      }
+    }
+  });
+
   return excludeSet;
 }
 
@@ -2503,44 +2658,91 @@ function endGame(result) {
     isHumanWin ? 'あなたの勝利' : '敵の勝利';
   document.querySelector('.result-trophy').style.display = 'none';
 
-  // 敵（CPU）の海図をすべて公開して表示
-  renderResultGrid();
+  // タブを敵海図にリセットして表示
+  switchResultTab('enemy');
 
   showPage('page-result');
 }
 
 // 敵の艦隊配置を全て公開して表示するグリッド
-function renderResultGrid() {
-  const enemyPd = state.playerData[1]; // 敵（CPU）の海図
-  const myAttacksOnEnemy = enemyPd.attacks; // 自分が敵を攻撃した履歴
+let resultTab = 'enemy';
 
+function switchResultTab(tab) {
+  resultTab = tab;
+  document.getElementById('result-tab-enemy').classList.toggle('active', tab === 'enemy');
+  document.getElementById('result-tab-own').classList.toggle('active', tab === 'own');
+  document.getElementById('result-grid-title').textContent =
+    tab === 'enemy' ? '敵の海図（答え）' : '自分の海図';
+  renderResultGrid();
+}
+
+function renderResultGrid() {
   const grid = document.getElementById('result-grid');
   grid.innerHTML = '';
   grid.appendChild(makeHeader(''));
   COLS.forEach(c => grid.appendChild(makeHeader(c)));
 
-  ROWS.forEach((r, ri) => {
-    grid.appendChild(makeHeader(r));
-    COLS.forEach((c, ci) => {
-      const cell = document.createElement('div');
-      cell.className = 'cell';
+  if (resultTab === 'enemy') {
+    // 敵（CPU）の海図を全公開
+    const enemyPd = state.playerData[1];
+    const myAttacksOnEnemy = enemyPd.attacks;
 
-      const shipHere = enemyPd.ships.find(s => s.cells.some(cl => cl[0] === ci && cl[1] === ri));
-      if (shipHere) {
-        cell.classList.add('ship');
-        cell.textContent = SHIP_LABELS[shipHere.id] || '艦';
-        cell.style.fontWeight = '700';
-        cell.style.fontSize = '10px';
-        // 命中していたら色を変える
-        const wasHit = myAttacksOnEnemy.some(a => a.coord[0] === ci && a.coord[1] === ri && a.result === 'hit');
-        if (wasHit) {
-          cell.style.background = 'var(--hit-bg)';
-          cell.style.color = 'var(--red)';
+    ROWS.forEach((r, ri) => {
+      grid.appendChild(makeHeader(r));
+      COLS.forEach((c, ci) => {
+        const cell = document.createElement('div');
+        cell.className = 'cell';
+
+        const shipHere = enemyPd.ships.find(s => s.cells.some(cl => cl[0] === ci && cl[1] === ri));
+        if (shipHere) {
+          cell.classList.add('ship');
+          cell.textContent = SHIP_LABELS[shipHere.id] || '艦';
+          cell.style.fontWeight = '700';
+          cell.style.fontSize = '10px';
+          const wasHit = myAttacksOnEnemy.some(a => a.coord[0] === ci && a.coord[1] === ri && a.result === 'hit');
+          if (wasHit) {
+            cell.style.background = 'var(--hit-bg)';
+            cell.style.color = 'var(--red)';
+          }
         }
-      }
-      grid.appendChild(cell);
+        grid.appendChild(cell);
+      });
     });
-  });
+  } else {
+    // 自分の海図：自艦の配置＋敵から受けた攻撃結果
+    const myPd = state.playerData[0];
+
+    ROWS.forEach((r, ri) => {
+      grid.appendChild(makeHeader(r));
+      COLS.forEach((c, ci) => {
+        const cell = document.createElement('div');
+        cell.className = 'cell';
+
+        const shipHere = myPd.ships.find(s => s.cells.some(cl => cl[0] === ci && cl[1] === ri));
+        const attack = myPd.attacks.find(a => a.coord[0] === ci && a.coord[1] === ri);
+
+        if (shipHere) {
+          cell.classList.add('ship');
+          cell.textContent = SHIP_LABELS[shipHere.id] || '艦';
+          cell.style.fontWeight = '700';
+          cell.style.fontSize = '10px';
+          if (attack && attack.result === 'hit') {
+            cell.style.background = 'var(--hit-bg)';
+            cell.style.color = 'var(--red)';
+          }
+        } else if (attack) {
+          if (attack.result === 'near') {
+            cell.classList.add('near');
+            cell.textContent = '△';
+          } else if (attack.result === 'miss') {
+            cell.classList.add('miss');
+            cell.textContent = '×';
+          }
+        }
+        grid.appendChild(cell);
+      });
+    });
+  }
 }
 
 // ==============================

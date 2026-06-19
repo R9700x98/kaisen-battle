@@ -715,13 +715,12 @@ nav {
       </svg>
     </div>
     <h2>Kaisen Battle</h2>
-    <div style="margin-bottom:16px">
-      <p style="font-size:12px;font-weight:600;color:var(--label3);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:10px">難易度</p>
+    <div style="display:none">
       <div class="seg-control" id="diff-seg">
         <button class="seg-btn" id="diff-easy"   onclick="setDifficulty('easy')">Easy</button>
-        <button class="seg-btn active" id="diff-normal" onclick="setDifficulty('normal')">Normal</button>
+        <button class="seg-btn" id="diff-normal" onclick="setDifficulty('normal')">Normal</button>
         <button class="seg-btn" id="diff-hard"   onclick="setDifficulty('hard')">Hard</button>
-        <button class="seg-btn" id="diff-expert" onclick="setDifficulty('expert')">Expert</button>
+        <button class="seg-btn active" id="diff-expert" onclick="setDifficulty('expert')">Expert</button>
       </div>
     </div>
     <button class="btn btn-primary" onclick="startGame('vs-cpu')">ゲームスタート</button>
@@ -818,12 +817,12 @@ nav {
 <!-- ========== 対戦 ========== -->
 <div id="page-battle" class="page">
   <div class="screen">
-    <div class="status-pill-row">
-      <div class="status-pill">
+    <div class="status-pill-row" style="justify-content:center">
+      <div class="status-pill" style="flex:none;min-width:160px;align-items:center;text-align:center">
         <span class="pill-label">攻撃側</span>
         <span class="pill-val accent" id="atk-player" style="font-size:15px;margin-top:2px">—</span>
       </div>
-      <div class="status-pill">
+      <div class="status-pill" style="display:none">
         <span class="pill-label">自分の残り攻撃</span>
         <span class="pill-val" id="atk-remain">100</span>
       </div>
@@ -831,7 +830,7 @@ nav {
         <span class="pill-label">敵の残り攻撃</span>
         <span class="pill-val" id="cpu-remain" style="color:var(--red)">100</span>
       </div>
-      <div class="status-pill" id="diff-pill">
+      <div class="status-pill" id="diff-pill" style="display:none">
         <span class="pill-label">難易度</span>
         <span class="pill-val" id="diff-display" style="font-size:14px;margin-top:2px">—</span>
       </div>
@@ -901,7 +900,7 @@ nav {
 
     <!-- ログタブ -->
     <div id="tab-content-log" style="display:none">
-      <div class="card">
+      <div class="card" style="display:none">
         <div class="card-title">残り攻撃回数</div>
         <div class="counter-grid" id="attack-counter"></div>
       </div>
@@ -1130,7 +1129,7 @@ function getCarrierCells(ci, ri, rotation) {
 let state = {
   players: ['艦長', '敵'],
   mode: 'vs-cpu', // 'vs-cpu' | 'vs-human'
-  difficulty: 'normal', // 'easy' | 'normal' | 'hard'
+  difficulty: 'expert', // 'easy' | 'normal' | 'hard'
   currentPlayer: 0, // 0=人間, 1=敵(vs-cpuモード)
   phase: 'placement',
   placementPlayer: 0,
@@ -1546,11 +1545,6 @@ function startBattle() {
   showPage('page-battle');
   updatePhaseLabel('対戦中');
   // 難易度表示
-  const labels = { easy:'Easy', normal:'Normal', hard:'Hard', expert:'Expert' };
-  const el = document.getElementById('diff-display');
-  if (el) el.textContent = labels[state.difficulty] || '';
-  const pill = document.getElementById('diff-pill');
-  if (pill) pill.style.display = state.mode === 'vs-cpu' ? '' : 'none';
   const cpuPill = document.getElementById('cpu-remain-pill');
   if (cpuPill) cpuPill.style.display = 'none';
 }
@@ -2073,7 +2067,7 @@ function cpuChooseNormal() {
     if (lineTargets.length > 0)
       return lineTargets[Math.floor(Math.random() * lineTargets.length)];
 
-    // 命中周囲4方向
+    // 命中周囲4方向（△優先・周囲の未攻撃マスが残る限り継続追跡）
     const around = getAroundHits(activeHits, unset);
     if (around.length > 0)
       return around[Math.floor(Math.random() * around.length)];
@@ -2131,20 +2125,34 @@ function buildForbiddenSet(info, excludeZone) {
 }
 
 // あるパターン（セルリスト）が現在の情報と矛盾しないか検証
-function isPatternValid(cells, info, forbidden, requiredLine, isShaped) {
+function isPatternValid(cells, info, forbidden, requiredLine, isShaped, activeHits) {
   const cellKeys = cells.map(([c,r]) => `${c},${r}`);
 
-  // 1. 禁止マスに重なるパターンは無効（×はずれ＋周囲8マス＋撃沈除外ゾーン＋隣接禁止ゾーン）
-  if (cellKeys.some(k => forbidden.has(k))) return false;
+  // 追跡中（このパターンが命中マスを含む）かどうか
+  const isTracking = activeHits && cellKeys.some(k => activeHits.has(k));
 
-  // 2. はずれマスを含むパターンは無効
+  // 1. 禁止マスに重なるパターンは無効
+  //    ただし「命中済みマス」は除外ゾーンと重なっていても有効
+  //    追跡中パターンは除外ゾーン（隣接禁止）チェックを緩和：
+  //    命中マス以外のセルも、×はずれマスとの重複のみチェック（除外ゾーンは無視）
+  if (isTracking) {
+    // 追跡中: ×（miss）と△（near）マスには艦のセルは置けない
+    // ただし命中済み（hit）マスは除外ゾーンと重なっても許容
+    for (const k of cellKeys) {
+      if (info.miss.has(k)) return false;  // ×マスはNG
+      if (info.near.has(k) && !info.hit.has(k)) return false;  // △マスはNG（命中でない場合）
+    }
+  } else {
+    // 探索中: 従来通り forbidden 全体チェック（命中済みマスは例外）
+    if (cellKeys.some(k => forbidden.has(k) && !info.hit.has(k))) return false;
+  }
+
+  // 2. はずれマスを含むパターンは無効（追跡中も同様）
   for (const k of cellKeys) {
     if (info.miss.has(k)) return false;
   }
 
-  // 3. 【改善①】直線が確定している場合、その直線上にないパターンは完全除外
-  //    ただしL字形（空母など shaped:true）の船には直線制約を適用しない。
-  //    L字は一部が直線状に並んでいても、途中で折れ曲がる可能性があるため。
+  // 3. 直線制約（L字船は除外）
   if (requiredLine && !isShaped) {
     const onLine = cells.every(([c, r]) =>
       requiredLine.axis === 'h' ? r === requiredLine.fixed : c === requiredLine.fixed
@@ -2170,12 +2178,56 @@ function patternExplainsNears(cells, nearKeys) {
 // 【改善①】命中マス群から直線（軸＋固定座標）を検出する
 function detectRequiredLine(activeHitsArr) {
   if (activeHitsArr.length < 2) return null;
-  // 全て同じ行なら水平、全て同じ列なら垂直
   const allSameRow = activeHitsArr.every(([,r]) => r === activeHitsArr[0][1]);
   const allSameCol = activeHitsArr.every(([c]) => c === activeHitsArr[0][0]);
   if (allSameRow) return { axis: 'h', fixed: activeHitsArr[0][1] };
   if (allSameCol) return { axis: 'v', fixed: activeHitsArr[0][0] };
-  return null; // L字（空母）など直線にならない場合は制約なし
+  return null;
+}
+
+// 直線命中クラスターに対して「空母L字の可能性を確認するために
+// 攻撃すべき追加マス候補」を返す。
+// 例: 横4命中なら上3マス・下3マスが候補。そのうち未攻撃のものを返す。
+function getCarrierCheckCandidates(activeHitsArr, attacked) {
+  if (activeHitsArr.length < 2) return [];
+  const hitSet = new Set(activeHitsArr.map(([c,r]) => `${c},${r}`));
+
+  // 命中クラスターの範囲
+  const minC = Math.min(...activeHitsArr.map(([c]) => c));
+  const maxC = Math.max(...activeHitsArr.map(([c]) => c));
+  const minR = Math.min(...activeHitsArr.map(([,r]) => r));
+  const maxR = Math.max(...activeHitsArr.map(([,r]) => r));
+
+  // 空母パターンの中でこの命中クラスターを含むものを全列挙し、
+  // 「追加マス」（未命中の空母セル候補）を収集する
+  // ただし壁（グリッド端）で塞がれている方向は除外する
+  const extraSet = new Set();
+  for (let rot = 0; rot < 4; rot++) {
+    const offsets = getCarrierShape(rot);
+    const maxDX = Math.max(...offsets.map(([x]) => x));
+    const maxDY = Math.max(...offsets.map(([,y]) => y));
+    for (let ci = 0; ci + maxDX < 10; ci++) {
+      for (let ri = 0; ri + maxDY < 10; ri++) {
+        const cells = offsets.map(([dx,dy]) => [ci+dx, ri+dy]);
+        const keys = cells.map(([c,r]) => `${c},${r}`);
+        if (![...hitSet].every(k => keys.includes(k))) continue;
+        // 追加マスのうち未攻撃のものを候補に加える
+        // 壁際チェック: 追加マスの方向がグリッド端で不可能なら除外
+        keys.filter(k => !hitSet.has(k) && !attacked.has(k)).forEach(k => {
+          const [ec, er] = k.split(',').map(Number);
+          // 追加マスがクラスターの上下左右どちら側か判定
+          // その方向にグリッド端から余地があるかチェック
+          if (er < minR && minR === 0) return; // 上方向 + 上端
+          if (er > maxR && maxR === 9) return; // 下方向 + 下端
+          if (ec < minC && minC === 0) return; // 左方向 + 左端
+          if (ec > maxC && maxC === 9) return; // 右方向 + 右端
+          extraSet.add(k);
+        });
+      }
+    }
+  }
+
+  return [...extraSet].map(k => k.split(',').map(Number));
 }
 
 function cpuChooseExpert() {
@@ -2208,11 +2260,34 @@ function cpuChooseExpert() {
   // 攻撃済みマス
   const attacked = new Set(cpuPd.myAttacks.map(a => `${a.coord[0]},${a.coord[1]}`));
 
-  // 【改善④】終盤の詰めロジック：残り船が少ない場合、全パターンの積算で
-  // 「全てのパターンに共通して含まれるマス」があれば確実に当たる
-  if (aliveShips.length <= 2) {
-    const sureHit = findSureHitCell(aliveShips, info, forbidden, requiredLine, attacked);
+  // 【改善④+拡張】詰めロジック：
+  //   - 残り船が少ない終盤、または
+  //   - アクティブな命中が2つ以上ある場合（空母L字の折れ曲がりなど確定できるケース）
+  // 全パターンの積集合で「確実に当たるマス」があれば最優先で攻撃する
+  const shouldTrySureHit = aliveShips.length <= 2 || activeHitsArr.length >= 2;
+  if (shouldTrySureHit) {
+    const sureHit = findSureHitCell(aliveShips, info, forbidden, requiredLine, attacked, activeHitsArr.length, activeHits);
     if (sureHit) return sureHit;
+  }
+
+  // 【空母確認ロジック】
+  // 直線2マス以上の命中クラスターがある場合、空母L字の可能性を確認するために
+  // 「空母パターンの追加セル候補」を最優先で攻撃する
+  // （例: 横4命中の場合、上3マスか下3マスを確認しないと護衛艦か空母か確定できない）
+  // ただしL字状の命中（直線でない）は空母を追跡中なので対象外
+  const carrierAlive = aliveShips.some(s => s.id === 'carrier');
+  if (carrierAlive && requiredLine && activeHitsArr.length >= 2) {
+    const carrierCheckCandidates = getCarrierCheckCandidates(activeHitsArr, attacked);
+    if (carrierCheckCandidates.length > 0) {
+      // ×やすでに攻撃済みを除き、×周囲・near済みも除いて候補を絞る
+      const validCandidates = carrierCheckCandidates.filter(([c, r]) => {
+        const k = `${c},${r}`;
+        return !info.miss.has(k) && !info.near.has(k) && !attacked.has(k);
+      });
+      if (validCandidates.length > 0) {
+        return validCandidates[Math.floor(Math.random() * validCandidates.length)];
+      }
+    }
   }
 
   // スコアマップ
@@ -2223,7 +2298,7 @@ function cpuChooseExpert() {
     const patterns = getAllShipPatterns(ship);
 
     patterns.forEach(cells => {
-      if (!isPatternValid(cells, info, forbidden, requiredLine, ship.shaped)) return;
+      if (!isPatternValid(cells, info, forbidden, requiredLine, ship.shaped, activeHits)) return;
 
       const cellKeys = cells.map(([c,r]) => `${c},${r}`);
       const hitCount = cellKeys.filter(k => activeHits.has(k)).length;
@@ -2303,13 +2378,28 @@ function cpuChooseExpert() {
 }
 
 // 【改善④終盤詰め】全パターンに共通して含まれる「確実に当たる」マスを探す
-function findSureHitCell(aliveShips, info, forbidden, requiredLine, attacked) {
+function findSureHitCell(aliveShips, info, forbidden, requiredLine, attacked, activeHitCount = 0, activeHits = null) {
+  // 命中が多いほどパターンは絞り込まれているので上限を緩和する
+  const patternLimit = activeHitCount >= 3 ? 200 : activeHitCount >= 2 ? 80 : 40;
+
   for (const ship of aliveShips) {
     const patterns = getAllShipPatterns(ship)
-      .filter(cells => isPatternValid(cells, info, forbidden, requiredLine, ship.shaped));
-    if (patterns.length === 0 || patterns.length > 40) continue; // 多すぎる場合は通常ロジックへ
+      .filter(cells => isPatternValid(cells, info, forbidden, requiredLine, ship.shaped, activeHits));
+    if (patterns.length === 0 || patterns.length > patternLimit) continue;
 
-    // 全パターンの積集合（全パターンに共通するセル）
+    // パターンが1つに絞れた場合 → その残りマスは全て確定
+    if (patterns.length === 1) {
+      const remaining = patterns[0]
+        .map(([c,r]) => `${c},${r}`)
+        .filter(k => !attacked.has(k) && !info.hit.has(k));
+      if (remaining.length > 0) {
+        const [c, r] = remaining[0].split(',').map(Number);
+        return [c, r];
+      }
+      continue;
+    }
+
+    // パターンが複数でも全パターンの積集合（必ず当たるマス）を探す
     let common = new Set(patterns[0].map(([c,r]) => `${c},${r}`));
     for (let i = 1; i < patterns.length; i++) {
       const setI = new Set(patterns[i].map(([c,r]) => `${c},${r}`));
@@ -2363,6 +2453,7 @@ function getAllShipPatterns(ship) {
 
 // 撃沈済み船のセル＋周囲8マスを除外ゾーンとして返す
 function getSunkExcludeZone() {
+  // 撃沈済みの艦のセルとその周囲8マスを除外ゾーンとする
   const humanPd = state.playerData[0];
   const excludeSet = new Set();
   humanPd.ships.forEach(ship => {
@@ -2472,7 +2563,7 @@ function cpuChooseHard() {
     if (lineTargets.length > 0)
       return lineTargets[Math.floor(Math.random() * lineTargets.length)];
 
-    // 命中周囲4方向
+    // 命中周囲4方向（△優先・周囲の未攻撃マスが残る限り継続追跡）
     const around = getAroundHits(activeHits, unset);
     if (around.length > 0)
       return around[Math.floor(Math.random() * around.length)];
@@ -2520,18 +2611,41 @@ function getLineExtensions(hits, unset) {
   return [...new Map(candidates.map(c => [`${c[0]},${c[1]}`, c])).values()];
 }
 
-// 命中セル周囲4方向の未攻撃セル
+// 命中セル周囲4方向の未攻撃セル（△波高しがある方向を優先）
 function getAroundHits(hits, unset) {
   const dirs = [[1,0],[-1,0],[0,1],[0,-1]];
-  const candidates = [];
+  const cpuPd = state.playerData[1];
+  const nearSet = new Set(
+    cpuPd.myAttacks.filter(a => a.result === 'near').map(a => `${a.coord[0]},${a.coord[1]}`)
+  );
+
+  const priority = [];   // △がある方向（有望）
+  const normal   = [];   // △なし
+
   hits.forEach(([hc, hr]) => {
     dirs.forEach(([dc, dr]) => {
       const nc = hc + dc, nr = hr + dr;
-      if (nc >= 0 && nc < 10 && nr >= 0 && nr < 10 && unset.has(`${nc},${nr}`))
-        candidates.push([nc, nr]);
+      if (nc < 0 || nc >= 10 || nr < 0 || nr >= 10) return;
+      if (!unset.has(`${nc},${nr}`)) return;
+
+      // そのマス自体、またはその周囲に△があれば優先
+      let hasNearHint = nearSet.has(`${nc},${nr}`);
+      if (!hasNearHint) {
+        for (let dc2 = -1; dc2 <= 1; dc2++)
+          for (let dr2 = -1; dr2 <= 1; dr2++)
+            if (nearSet.has(`${nc+dc2},${nr+dr2}`)) hasNearHint = true;
+      }
+
+      if (hasNearHint) priority.push([nc, nr]);
+      else             normal.push([nc, nr]);
     });
   });
-  return [...new Map(candidates.map(c => [`${c[0]},${c[1]}`, c])).values()];
+
+  // 重複排除
+  const dedup = (arr) => [...new Map(arr.map(c => [`${c[0]},${c[1]}`, c])).values()];
+  const result = dedup(priority);
+  if (result.length > 0) return result;
+  return dedup(normal);
 }
 
 // △波高しセルのスコアリング（周囲に△が多いほど高スコア）

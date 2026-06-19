@@ -2251,14 +2251,29 @@ function cpuChooseExpert() {
   // 未撃沈の船リスト
   const aliveShips = humanPd.ships.filter(s => !s.sunk);
 
+  // 【潜水艦確認ロジック】
+  // 撃沈済み潜水艦（1マス艦）の周囲4方向にまだ未攻撃マスがある場合、
+  // そこを最優先で攻撃して「1マスしかない」ことを確認する
+  const attacked = new Set(cpuPd.myAttacks.map(a => `${a.coord[0]},${a.coord[1]}`));
+  const subConfirmTargets = [];
+  humanPd.ships.forEach(ship => {
+    if (!ship.sunk || ship.size > 1) return;
+    const [sc, sr] = ship.cells[0];
+    [[1,0],[-1,0],[0,1],[0,-1]].forEach(([dc, dr]) => {
+      const nc = sc + dc, nr = sr + dr;
+      if (nc < 0 || nc >= 10 || nr < 0 || nr >= 10) return;
+      if (!attacked.has(`${nc},${nr}`)) subConfirmTargets.push([nc, nr]);
+    });
+  });
+  if (subConfirmTargets.length > 0) {
+    return subConfirmTargets[Math.floor(Math.random() * subConfirmTargets.length)];
+  }
+
   // 【改善①】直線が確定しているか検出
   const requiredLine = detectRequiredLine(activeHitsArr);
 
   // アクティブな波高しマス
   const activeNearKeys = [...info.near].filter(k => !excludeZone.has(k));
-
-  // 攻撃済みマス
-  const attacked = new Set(cpuPd.myAttacks.map(a => `${a.coord[0]},${a.coord[1]}`));
 
   // 【改善④+拡張】詰めロジック：
   //   - 残り船が少ない終盤、または
@@ -2453,20 +2468,54 @@ function getAllShipPatterns(ship) {
 
 // 撃沈済み船のセル＋周囲8マスを除外ゾーンとして返す
 function getSunkExcludeZone() {
-  // 撃沈済みの艦のセルとその周囲8マスを除外ゾーンとする
   const humanPd = state.playerData[0];
+  const cpuPd   = state.playerData[1];
   const excludeSet = new Set();
+
+  const attackedSet = new Set(cpuPd.myAttacks.map(a => `${a.coord[0]},${a.coord[1]}`));
+  const hitSet = new Set(
+    cpuPd.myAttacks.filter(a => a.result === 'hit').map(a => `${a.coord[0]},${a.coord[1]}`)
+  );
+
   humanPd.ships.forEach(ship => {
     if (!ship.sunk) return;
-    ship.cells.forEach(([sc, sr]) => {
+
+    // 複数マスの艦（護衛艦・空母）: 撃沈確定なのでそのまま除外ゾーンに追加
+    if (ship.size > 1) {
+      ship.cells.forEach(([sc, sr]) => {
+        for (let dc = -1; dc <= 1; dc++)
+          for (let dr = -1; dr <= 1; dr++) {
+            const nc = sc + dc, nr = sr + dr;
+            if (nc >= 0 && nc < 10 && nr >= 0 && nr < 10)
+              excludeSet.add(`${nc},${nr}`);
+          }
+      });
+      return;
+    }
+
+    // 1マスの艦（潜水艦）: 周囲4方向を全て攻撃済みか確認してから除外ゾーンに追加
+    // → CPUが「ここは1マスしかない」と確認できた場合のみ除外
+    const [sc, sr] = ship.cells[0];
+    const key = `${sc},${sr}`;
+    const dirs = [[1,0],[-1,0],[0,1],[0,-1]];
+    const allDirsChecked = dirs.every(([dc, dr]) => {
+      const nc = sc + dc, nr = sr + dr;
+      if (nc < 0 || nc >= 10 || nr < 0 || nr >= 10) return true; // 壁はOK
+      return attackedSet.has(`${nc},${nr}`);
+    });
+
+    if (allDirsChecked) {
+      // 周囲4方向確認済み → 除外ゾーンに追加
       for (let dc = -1; dc <= 1; dc++)
         for (let dr = -1; dr <= 1; dr++) {
           const nc = sc + dc, nr = sr + dr;
           if (nc >= 0 && nc < 10 && nr >= 0 && nr < 10)
             excludeSet.add(`${nc},${nr}`);
         }
-    });
+    }
+    // 未確認の場合は除外ゾーンに追加しない（周囲の攻撃を続ける）
   });
+
   return excludeSet;
 }
 
